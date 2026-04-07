@@ -1,0 +1,16 @@
+<ul class="list">
+  @for (m of members(); track trackMember($index, m)) {
+    <li class="member" [class.member--self]="m.id === localMemberId()">
+      <span class="member__name">{{ m.displayName }}</span>
+      @if (m.id === moderatorId()) {
+        <span class="badge">Moderator</span>
+      }
+      @if (m.isOnline) {
+        <span class="dot" title="Online" aria-label="Online"> </span>
+      }
+      <span class="vote-state" [attr.aria-label]="hasVoted(m) ? 'Voted' : 'Not voted'">
+        {{ hasVoted(m) ? '✓' : '—' }}
+      </span>
+    </li>
+  }
+</ul>

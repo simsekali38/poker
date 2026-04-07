@@ -1,0 +1,56 @@
+@switch (store.roomPhase()) {
+  @case ('loading') {
+    <app-planning-room-loading />
+  }
+  @case ('missing') {
+    <app-planning-room-missing />
+  }
+  @case ('ready') {
+    @if (store.roomView(); as vm) {
+      <span class="sr-only" aria-live="polite">{{ copyStatus() }}</span>
+
+      <app-session-header
+        [sessionTitle]="vm.sessionTitle"
+        [sessionId]="vm.sessionId"
+        [sessionCodeDisplay]="vm.sessionCodeDisplay"
+        (copyInvite)="copyInviteLink()"
+      />
+
+      <app-planning-room-error-banner
+        [message]="store.actionError()"
+        (dismiss)="store.dismissActionError()"
+      />
+
+      <app-planning-room-active-story-notice
+        [hasActiveStory]="!!vm.activeStoryId"
+        [canManageStories]="vm.canManageStories"
+      />
+
+      <div class="layout">
+        <div class="layout__side">
+          <app-planning-room-sidebar
+            [vm]="vm"
+            [storyBusy]="store.storyActionBusy()"
+            (switchStory)="onSwitchStory($event)"
+            (createStory)="onCreateStory($event)"
+          />
+        </div>
+        <div class="layout__main">
+          <app-planning-room-main-column
+            [vm]="vm"
+            [voteSubmitBusy]="store.voteSubmitBusy()"
+            [moderationBusy]="store.moderationBusy()"
+            (cardPicked)="onCardPicked($event)"
+            (reveal)="onReveal()"
+            (resetRound)="onReset()"
+            (editStory)="onEditStory()"
+          />
+        </div>
+      </div>
+    } @else {
+      <p class="load-fail" role="alert">We could not load this session’s data. Try refreshing the page.</p>
+    }
+  }
+}
+
+<app-story-edit-dialog (saved)="onStorySaved($event)" />

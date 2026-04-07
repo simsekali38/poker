@@ -1,0 +1,18 @@
+<div class="header">
+  <div class="titles">
+    <h1 class="title">{{ sessionTitle() || 'Planning session' }}</h1>
+    <p class="meta">
+      Session code: <code class="session-code" translate="no">{{ displayCode() }}</code>
+    </p>
+  </div>
+  <button
+    type="button"
+    class="btn"
+    (click)="onCopy()"
+    [disabled]="!sessionId()"
+    [attr.aria-disabled]="!sessionId() ? 'true' : null"
+    aria-label="Copy session invite link to clipboard"
+  >
+    Copy invite
+  </button>
+</div>

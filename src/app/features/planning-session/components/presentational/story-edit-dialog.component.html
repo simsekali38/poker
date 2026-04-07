@@ -1,0 +1,17 @@
+<dialog #dialog class="dlg" aria-modal="true" aria-labelledby="edit-story-title" (mousedown)="onBackdrop($event)">
+  <form class="dlg__card" [formGroup]="form" (ngSubmit)="onSave()">
+    <h2 class="dlg__title" id="edit-story-title">Edit current story</h2>
+    <label class="field">
+      <span class="field__label">Title</span>
+      <input class="field__input" type="text" formControlName="title" autocomplete="off" aria-labelledby="edit-story-title" />
+    </label>
+    <label class="field">
+      <span class="field__label">Description</span>
+      <textarea class="field__input field__textarea" formControlName="description" rows="3"></textarea>
+    </label>
+    <div class="dlg__actions">
+      <button type="button" class="btn" (click)="onCancel()">Cancel</button>
+      <button type="submit" class="btn primary" [disabled]="form.invalid">Save</button>
+    </div>
+  </form>
+</dialog>

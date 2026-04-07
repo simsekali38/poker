@@ -1,0 +1,22 @@
+.status {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  font: var(--font-body);
+  color: var(--color-text-secondary);
+  background: var(--color-bg);
+  border-radius: var(--radius-md);
+}
+
+.status__counts {
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.status__hint {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+.status__label{
+  padding: 0 5px;
+}

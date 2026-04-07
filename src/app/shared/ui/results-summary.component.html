@@ -1,0 +1,14 @@
+<section class="summary" aria-labelledby="results-heading">
+  <h2 id="results-heading" class="summary__title">Results</h2>
+  @if (numericAverage() !== null) {
+    <p class="avg">Numeric average: <strong>{{ numericAverage()?.toFixed(2) }}</strong></p>
+  }
+  <ul class="votes">
+    @for (v of votes(); track trackVote($index, v)) {
+      <li>
+        <span class="member">{{ v.memberId }}</span>
+        <span class="card">{{ v.selectedCard }}</span>
+      </li>
+    }
+  </ul>
+</section>

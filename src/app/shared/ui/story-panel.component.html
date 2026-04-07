@@ -1,0 +1,17 @@
+<section class="story-card" aria-labelledby="story-primary-heading">
+  <div class="story-card__toolbar">
+    <p class="story-card__eyebrow">Current story</p>
+    @if (canEdit()) {
+      <button type="button" class="story-card__edit" (click)="requestEdit()">Edit</button>
+    }
+  </div>
+
+  @if (story(); as s) {
+    <h2 id="story-primary-heading" class="story-card__title">{{ s.title }}</h2>
+    @if (s.description) {
+      <p class="story-card__desc">{{ s.description }}</p>
+    }
+  } @else {
+    <h2 id="story-primary-heading" class="story-card__title story-card__title--empty">No story selected yet</h2>
+  }
+</section>

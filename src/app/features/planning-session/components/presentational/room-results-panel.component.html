@@ -1,0 +1,90 @@
+@let avg = numericAverage();
+<section
+  class="ui-surface-card ui-surface-card--hover rounded-card p-6 md:p-8"
+  aria-labelledby="results-title"
+>
+  <h2 id="results-title" class="text-lg font-semibold tracking-tight text-ink md:text-xl">
+    Results
+  </h2>
+
+  @if (!hasActiveStory()) {
+    <div
+      class="mt-5 rounded-card-sm border border-dashed border-line bg-canvas/80 px-5 py-8 text-center transition-colors duration-200 hover:border-muted/40"
+      role="status"
+    >
+      <p class="mx-auto max-w-sm text-sm leading-relaxed text-muted">
+        Results will appear here once there is a story to vote on.
+      </p>
+    </div>
+  } @else if (!votesRevealed()) {
+    <div
+      class="mt-5 rounded-card-sm border border-dashed border-primary/20 bg-primary/[0.04] px-5 py-8 text-center transition-all duration-200 hover:border-primary/30 hover:bg-primary/[0.06]"
+      role="status"
+    >
+      <div
+        class="mx-auto mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-surface shadow-card"
+        aria-hidden="true"
+      >
+        <span class="text-lg text-muted">◆</span>
+      </div>
+      <p class="mx-auto max-w-sm text-sm font-medium text-ink">
+        Votes stay hidden until the moderator reveals them.
+      </p>
+      <p class="mx-auto mt-2 max-w-sm text-xs text-muted">You’ll see each estimate and the average here.</p>
+    </div>
+  } @else if (rows().length === 0) {
+    <div
+      class="mt-5 rounded-card-sm border border-line bg-canvas/50 px-5 py-6 text-center"
+      role="status"
+    >
+      <p class="text-sm text-muted">No votes were recorded for this round.</p>
+    </div>
+  } @else {
+    <div class="mt-6 flex flex-col gap-6">
+      @if (avg !== null) {
+        <div
+          class="animate-reveal-pop rounded-card-sm border border-success/30 bg-success/10 px-5 py-4 shadow-sm transition-transform duration-200 hover:scale-[1.01]"
+        >
+          <p class="text-xs font-semibold uppercase tracking-wider text-success">Numeric average</p>
+          <p class="mt-1 text-3xl font-bold tabular-nums tracking-tight text-ink md:text-4xl">
+            {{ avg | number: '1.0-2' }}
+          </p>
+        </div>
+      }
+
+      <div class="flex flex-col gap-3">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-muted">Team votes</h3>
+        <ul class="flex flex-col gap-2" role="list">
+          @for (r of rows(); track trackRow($index, r); let i = $index) {
+            <li
+              role="listitem"
+              [class]="
+                'group opacity-0 animate-reveal-pop rounded-card-sm border px-4 py-3 transition-all duration-200 hover:shadow-card-md ' +
+                (isOutlier(r.memberId) ? 'border-warning/35 bg-warning/[0.07]' : 'border-line bg-surface')
+              "
+              [style.animation-delay.ms]="rowDelayMs(i)"
+            >
+              <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex min-w-0 flex-1 flex-col gap-1">
+                  <span class="truncate text-sm font-semibold text-ink">{{ r.displayName }}</span>
+                  @if (isOutlier(r.memberId)) {
+                    <span
+                      class="inline-flex w-fit rounded-full bg-warning/15 px-2 py-0.5 text-[0.625rem] font-bold uppercase tracking-wide text-warning"
+                    >
+                      Spread outlier
+                    </span>
+                  }
+                </div>
+                <span
+                  class="shrink-0 rounded-md bg-canvas px-3 py-1.5 text-sm font-bold tabular-nums text-ink ring-1 ring-black/[0.04] transition-transform duration-200 group-hover:scale-105"
+                >
+                  {{ r.card | voteLabel }}
+                </span>
+              </div>
+            </li>
+          }
+        </ul>
+      </div>
+    </div>
+  }
+</section>

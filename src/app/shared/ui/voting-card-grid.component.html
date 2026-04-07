@@ -1,0 +1,16 @@
+<div
+  class="grid w-full grid-cols-[repeat(auto-fill,minmax(4.5rem,1fr))] gap-3 max-[480px]:grid-cols-[repeat(auto-fill,minmax(4rem,1fr))] max-[480px]:gap-2"
+  role="group"
+  [attr.aria-label]="ariaLabel()"
+>
+  @for (card of cards(); track $index; let i = $index) {
+    <app-voting-card
+      [label]="card | voteLabel"
+      [state]="cardState(card)"
+      [focusTabIndex]="focusTabIndexFor(i)"
+      (pick)="pick(card)"
+      (focusin)="onCardFocus(i)"
+      (deckNavigationKey)="onDeckNav($event, i)"
+    />
+  }
+</div>

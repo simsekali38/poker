@@ -1,0 +1,28 @@
+<section class="hero">
+  <h1>Planning Poker</h1>
+  <p class="lede">Realtime estimation sessions for agile teams.</p>
+  <div class="actions">
+    <a routerLink="/session/create" class="btn primary">Create session</a>
+  </div>
+
+  <div class="join-block">
+    <h2 class="join-title">Join with session ID</h2>
+    <p class="join-hint">Paste the code from your invite link, then continue to enter your name.</p>
+    <div class="join-row">
+      <label class="sr-only" for="session-code">Session ID</label>
+      <input
+        id="session-code"
+        type="text"
+        name="sessionCode"
+        [ngModel]="sessionCode()"
+        (ngModelChange)="sessionCode.set($event)"
+        autocomplete="off"
+        placeholder="e.g. ABC12XY8"
+        class="join-input"
+      />
+      <button type="button" class="btn" (click)="goToJoin()" [disabled]="!sessionCode().trim()">
+        Continue
+      </button>
+    </div>
+  </div>
+</section>

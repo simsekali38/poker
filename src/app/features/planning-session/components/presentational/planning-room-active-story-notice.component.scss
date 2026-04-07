@@ -1,0 +1,10 @@
+.notice {
+  padding: var(--space-3) var(--space-4);
+  margin: 0 0 var(--space-4);
+  border-radius: var(--radius-md);
+  font: var(--font-body);
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, var(--color-warning) 22%, var(--color-border));
+  line-height: 1.5;
+}

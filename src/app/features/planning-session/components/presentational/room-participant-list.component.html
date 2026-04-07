@@ -1,0 +1,35 @@
+@if (rows().length === 0) {
+  <p class="list-empty" role="status">No participants yet. Share the invite link so others can join.</p>
+}
+<ul class="list" role="list">
+  @for (p of rows(); track trackRow($index, p)) {
+    <li
+      class="member"
+      [class.member--self]="p.isLocalUser"
+      role="listitem"
+      [attr.aria-label]="p.displayName + (p.isModerator ? ', moderator' : '') + (p.isOnline ? ', online' : '') + ', ' + voteAria(p)"
+    >
+      <div class="member__avatar-wrap">
+        <div class="member__avatar" aria-hidden="true">{{ initialsFor(p.displayName) }}</div>
+        @if (p.isOnline) {
+          <span class="member__online" title="Online" aria-hidden="true"></span>
+        }
+      </div>
+      <div class="member__info">
+        <span class="member__name" [attr.title]="p.displayName">{{ p.displayName }}</span>
+        @if (p.isModerator) {
+          <span class="member__badge">Moderator</span>
+        }
+      </div>
+      <div class="member__vote" aria-hidden="true">
+        @if (p.cardLabel !== null) {
+          <span class="member__vote-label member__vote-label--value">{{ p.cardLabel | voteLabel }}</span>
+        } @else if (p.voteMasked) {
+          <span class="member__vote-label member__vote-label--voted">Voted</span>
+        } @else {
+          <span class="member__vote-label member__vote-label--pending">Not voted</span>
+        }
+      </div>
+    </li>
+  }
+</ul>

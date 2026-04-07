@@ -1,0 +1,9 @@
+<div class="status" role="status" aria-live="polite">
+  <strong class="status__counts">{{ votedCount() }} / {{ participantCount() }} </strong>
+  <span class="status__label"> participants have voted</span>
+  @if (votesRevealed()) {
+    <span class="status__hint"> · Results visible</span>
+  } @else {
+    <span class="status__hint"> · Cards hidden until reveal</span>
+  }
+</div>

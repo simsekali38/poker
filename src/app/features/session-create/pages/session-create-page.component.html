@@ -1,0 +1,96 @@
+<h1>Create session</h1>
+<p class="lede">Set up a room, then share the session link with your team.</p>
+
+@if (submitError(); as err) {
+  <div class="banner banner--error" role="alert" aria-live="polite">{{ err }}</div>
+}
+
+<form
+  [formGroup]="form"
+  (ngSubmit)="submit()"
+  novalidate
+  [attr.aria-busy]="isSubmitting() ? 'true' : 'false'"
+>
+  <div class="field">
+    <label for="sessionTitle">Session title</label>
+    <input
+      id="sessionTitle"
+      type="text"
+      formControlName="sessionTitle"
+      autocomplete="off"
+      appAutofocus
+      [attr.aria-invalid]="form.controls.sessionTitle.invalid && form.controls.sessionTitle.touched"
+    />
+    @if (form.controls.sessionTitle.touched && form.controls.sessionTitle.hasError('required')) {
+      <span class="field-error" role="alert">Enter a session title.</span>
+    }
+    @if (form.controls.sessionTitle.touched && form.controls.sessionTitle.hasError('minlength')) {
+      <span class="field-error" role="alert">At least 2 characters.</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="moderatorDisplayName">Your display name</label>
+    <input
+      id="moderatorDisplayName"
+      type="text"
+      formControlName="moderatorDisplayName"
+      autocomplete="nickname"
+      [attr.aria-invalid]="
+        form.controls.moderatorDisplayName.invalid && form.controls.moderatorDisplayName.touched
+      "
+    />
+    @if (
+      form.controls.moderatorDisplayName.touched && form.controls.moderatorDisplayName.hasError('required')
+    ) {
+      <span class="field-error" role="alert">Enter your name.</span>
+    }
+    @if (
+      form.controls.moderatorDisplayName.touched && form.controls.moderatorDisplayName.hasError('minlength')
+    ) {
+      <span class="field-error" role="alert">At least 2 characters.</span>
+    }
+  </div>
+
+  <div class="field">
+    <label for="deckPresetId">Deck</label>
+    <select id="deckPresetId" formControlName="deckPresetId">
+      @for (opt of deckOptions; track opt.id) {
+        <option [value]="opt.id">{{ opt.label }}</option>
+      }
+    </select>
+  </div>
+
+  <div class="field">
+    <label for="initialStoryTitle">First story title</label>
+    <input
+      id="initialStoryTitle"
+      type="text"
+      formControlName="initialStoryTitle"
+      autocomplete="off"
+      [attr.aria-invalid]="
+        form.controls.initialStoryTitle.invalid && form.controls.initialStoryTitle.touched
+      "
+    />
+    @if (form.controls.initialStoryTitle.touched && form.controls.initialStoryTitle.hasError('required')) {
+      <span class="field-error" role="alert">Enter a story title.</span>
+    }
+    @if (form.controls.initialStoryTitle.touched && form.controls.initialStoryTitle.hasError('minlength')) {
+      <span class="field-error" role="alert">At least 2 characters.</span>
+    }
+    @if (form.controls.initialStoryTitle.touched && form.controls.initialStoryTitle.hasError('maxlength')) {
+      <span class="field-error" role="alert">Max 200 characters.</span>
+    }
+  </div>
+
+  <div class="actions">
+    <button type="submit" class="btn primary" [disabled]="isSubmitting()">
+      @if (isSubmitting()) {
+        <span>Creating…</span>
+      } @else {
+        <span>Create session</span>
+      }
+    </button>
+    <a routerLink="/" class="btn ghost">Cancel</a>
+  </div>
+</form>

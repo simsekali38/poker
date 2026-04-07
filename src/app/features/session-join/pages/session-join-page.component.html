@@ -1,0 +1,71 @@
+<h1>Join session</h1>
+<p class="lede">
+  Enter your <strong>display name</strong> only — no separate login. A guest session is created in the
+  background so your vote can be saved securely.
+</p>
+
+@switch (loadState()) {
+  @case ('invalid_id') {
+    <p class="warn" role="alert">Missing or invalid session ID in the link.</p>
+  }
+  @case ('loading') {
+    <p class="muted" aria-live="polite">Checking session…</p>
+  }
+  @case ('not_found') {
+    <p class="warn" role="alert">
+      We could not find a session with this ID. It may have been mistyped or removed.
+    </p>
+  }
+  @case ('closed') {
+    <p class="warn" role="alert">
+      This session has ended and is closed. You cannot join it anymore.
+    </p>
+  }
+  @case ('error') {
+    <p class="warn" role="alert">Something went wrong while loading the session. Please try again.</p>
+  }
+  @case ('ready') {
+    @if (sessionId(); as sid) {
+      <p class="meta">
+        Session code:
+        <code class="session-code" translate="no">{{ formatSessionCode(sid) }}</code>
+      </p>
+    }
+  }
+}
+
+@if (submitError(); as err) {
+  <div class="banner banner--error" role="alert" aria-live="polite">{{ err }}</div>
+}
+
+@if (loadState() === 'ready' && sessionId()) {
+  <form
+    [formGroup]="form"
+    (ngSubmit)="join()"
+    novalidate
+    [attr.aria-busy]="isSubmitting() ? 'true' : 'false'"
+  >
+    <label class="field">
+      <span>Display name</span>
+      <input
+        formControlName="displayName"
+        type="text"
+        autocomplete="nickname"
+        appAutofocus
+        [attr.aria-invalid]="form.controls.displayName.invalid && form.controls.displayName.touched"
+      />
+    </label>
+    @if (form.controls.displayName.touched && form.controls.displayName.invalid) {
+      <p class="error" role="alert">Enter a name (2–64 characters).</p>
+    }
+    <button type="submit" class="btn primary" [disabled]="isSubmitting()">
+      @if (isSubmitting()) {
+        <span>Joining…</span>
+      } @else {
+        <span>Join session</span>
+      }
+    </button>
+  </form>
+}
+
+<p><a routerLink="/">← Home</a></p>

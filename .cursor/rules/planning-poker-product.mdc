@@ -1,0 +1,14 @@
+---
+description: Planning Poker ürün kapsamı, MVP/v2/v3 ve teknik/UX beklentileri (PRODUCT.md ile uyumlu).
+alwaysApply: true
+---
+
+# Planning Poker — proje bağlamı
+
+- **Ürün kapsamı ve yol haritası** için kök dizindeki `PRODUCT.md` dosyasını referans al. Yeni özellik veya refactor öncesi MVP / v2 / v3 ayrımına uy.
+- **Mimari**: Angular standalone, repository token’ları (`SESSION_*`, `STORY_*`, `VOTE_*`), feature altında store/facade, Firestore `switchMap(sessionId)` ile abonelik temizliği.
+- **Güvenlik**: Moderator-only işlemler servis + Firestore rules ile çift düşünülür; istemci kontrolleri yeterli değildir.
+- **Auth / guard**: `participantReadyGuard` için `authState` kullanımına uy; refresh sonrası anonim oturum için senkron `currentUser` varsayma.
+- **UX**: Gizli oylar için maskeli durum; reveal sonrası tutarlı sonuç listesi; boş durumlar (session yok, katılımcı yok, sonuç yok) açık metinle.
+
+Özellik önerirken `PRODUCT.md` içindeki checkbox’ları güncellemeyi öner (kullanıcı onaylarsa).

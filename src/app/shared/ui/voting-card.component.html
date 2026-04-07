@@ -1,0 +1,13 @@
+<button
+  type="button"
+  [class]="buttonClasses()"
+  [class.animate-vote-pulse]="votePulse() && state() === 'selected'"
+  [attr.tabindex]="effectiveTabIndex()"
+  [attr.aria-disabled]="isDisabled() ? true : null"
+  [attr.aria-pressed]="isDisabled() ? null : isSelectedLike()"
+  [disabled]="isDisabled()"
+  (click)="select()"
+  (keydown)="onButtonKeydown($event)"
+>
+  <span class="block select-none text-center pointer-events-none">{{ label() }}</span>
+</button>
