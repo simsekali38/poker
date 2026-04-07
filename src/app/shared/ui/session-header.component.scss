@@ -36,35 +36,3 @@
   border-radius: var(--radius-sm);
   color: var(--color-text);
 }
-
-.btn {
-  padding: var(--space-2) var(--space-4);
-  border-radius: var(--radius-md);
-  border: none;
-  background: var(--color-primary);
-  color: #fff;
-  font: var(--font-label);
-  font-weight: 600;
-  cursor: pointer;
-  box-shadow: var(--shadow-xs);
-  transition:
-    background var(--duration-fast) var(--ease-out),
-    box-shadow var(--duration-fast) var(--ease-out),
-    transform 0.12s var(--ease-out);
-
-  &:hover:not(:disabled) {
-    background: var(--color-primary-hover);
-    box-shadow: var(--shadow-sm);
-  }
-
-  &:active:not(:disabled) {
-    background: var(--color-primary-active);
-    transform: scale(0.98);
-  }
-
-  &:disabled {
-    opacity: 0.45;
-    cursor: not-allowed;
-    box-shadow: none;
-  }
-}

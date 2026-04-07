@@ -1,7 +1,9 @@
 import { DocumentData, DocumentSnapshot, Timestamp } from 'firebase/firestore';
 import {
   DeckPresetId,
+  DEFAULT_ROUND_TIMER_DURATION_SEC,
   RevealState,
+  RoundTimerState,
   Session,
   SessionSettings,
   SessionStatus,
@@ -45,6 +47,24 @@ function mapRevealState(raw: unknown): RevealState | null {
   };
 }
 
+function mapRoundTimer(raw: unknown): RoundTimerState {
+  if (!raw || typeof raw !== 'object') {
+    return {
+      durationSec: DEFAULT_ROUND_TIMER_DURATION_SEC,
+      isRunning: false,
+      startedAt: null,
+    };
+  }
+  const o = raw as Record<string, unknown>;
+  const d = typeof o['durationSec'] === 'number' ? o['durationSec'] : DEFAULT_ROUND_TIMER_DURATION_SEC;
+  const durationSec = Math.min(3600, Math.max(10, Math.round(d)));
+  return {
+    durationSec,
+    isRunning: Boolean(o['isRunning']),
+    startedAt: o['startedAt'] ? toDate(o['startedAt']) : null,
+  };
+}
+
 function mapSettings(raw: unknown): SessionSettings | null {
   if (!raw || typeof raw !== 'object') {
     return null;
@@ -85,6 +105,7 @@ export function mapSessionDocument(docId: string, data: DocumentData): Session |
     revealState,
     activeStoryId: typeof activeStoryRaw === 'string' ? activeStoryRaw : null,
     updatedAt: toDate(data['updatedAt']),
+    roundTimer: mapRoundTimer(data['roundTimer']),
   };
 }
 

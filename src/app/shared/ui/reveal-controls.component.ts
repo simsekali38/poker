@@ -1,9 +1,12 @@
 import { Component, input, output } from '@angular/core';
+import { UiButtonDirective } from '@app/shared/ui/design-system';
 
 @Component({
   selector: 'app-reveal-controls',
   standalone: true,
+  imports: [UiButtonDirective],
   templateUrl: './reveal-controls.component.html',
+  styleUrl: './reveal-controls.component.scss',
 })
 export class RevealControlsComponent {
   readonly isModerator = input(false);

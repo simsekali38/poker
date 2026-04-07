@@ -1,11 +1,12 @@
 import { Component, input, output, signal } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { UiButtonDirective, UiPanelComponent, UiPanelHeaderDirective } from '@app/shared/ui/design-system';
 import { StoryHistoryRowVm } from '../../models/planning-room.view-model';
 
 @Component({
   selector: 'app-room-story-history',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, UiButtonDirective, UiPanelComponent, UiPanelHeaderDirective],
   templateUrl: './room-story-history.component.html',
   styleUrl: './room-story-history.component.scss',
 })

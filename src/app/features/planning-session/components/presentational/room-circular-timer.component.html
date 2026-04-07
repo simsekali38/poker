@@ -1,0 +1,59 @@
+<section
+  class="circ-timer ui-panel ui-panel--compact"
+  [class.circ-timer--warn]="warnVisual()"
+  [class.circ-timer--danger]="dangerVisual() || finishedVisual()"
+  aria-label="Round timer"
+>
+  <p class="circ-timer__eyebrow">Round timer</p>
+
+  <div class="circ-timer__ring-wrap">
+    <svg class="circ-timer__svg" viewBox="0 0 120 120" aria-hidden="true">
+      <circle class="circ-timer__track" cx="60" cy="60" r="52" fill="none" />
+      <circle
+        class="circ-timer__progress"
+        [class.circ-timer__progress--warn]="warnVisual()"
+        [class.circ-timer__progress--danger]="dangerVisual() || finishedVisual()"
+        cx="60"
+        cy="60"
+        r="52"
+        fill="none"
+        [attr.stroke-dasharray]="ringCircumference"
+        [attr.stroke-dashoffset]="ringOffset()"
+      />
+    </svg>
+    <div class="circ-timer__center">
+      <p class="circ-timer__time" aria-live="polite">{{ centerLabel() }}</p>
+      <p class="circ-timer__sub">{{ subtitle() }}</p>
+    </div>
+  </div>
+
+  @if (isModerator()) {
+    <div class="circ-timer__controls">
+      @if (!isRunning()) {
+        <button type="button" uiBtn="primary" uiBtnSize="sm" [disabled]="busy()" (click)="start.emit()">
+          Start
+        </button>
+      } @else {
+        <button type="button" uiBtn="secondary" uiBtnSize="sm" [disabled]="busy()" (click)="stop.emit()">
+          Pause
+        </button>
+      }
+      <button type="button" uiBtn="ghost" uiBtnSize="sm" [disabled]="busy()" (click)="reset.emit()">
+        Reset
+      </button>
+      <label class="circ-timer__duration">
+        <span class="sr-only">Duration in seconds</span>
+        <input
+          type="number"
+          class="ui-input ui-input--narrow"
+          [value]="durationSec()"
+          min="10"
+          max="3600"
+          [disabled]="busy() || isRunning()"
+          (change)="onDurationInput($event)"
+        />
+        <span class="circ-timer__duration-suffix">sec</span>
+      </label>
+    </div>
+  }
+</section>

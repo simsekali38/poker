@@ -1,5 +1,6 @@
 import { Session, SessionMember, Story, Vote } from '@app/core/models';
 import { formatSessionCodeForDisplay } from '@app/shared/utils/session-code.utils';
+import { everyoneActiveOnlineHasVoted } from '@app/shared/utils/everyone-voted.util';
 import { averageNumericVotes } from '@app/shared/utils/voting.utils';
 import {
   ParticipantRowVm,
@@ -78,6 +79,14 @@ export function buildPlanningRoomViewModel(
   const canManageStories = isModerator && session.status === 'active';
   const canEditActiveStory = canManageStories && hasStory;
 
+  const everyoneActiveVoted = everyoneActiveOnlineHasVoted({
+    members,
+    votes,
+    sessionStatus: session.status,
+    activeStoryId: session.activeStoryId,
+    votesRevealed: revealed,
+  });
+
   const storyHistoryRows: StoryHistoryRowVm[] = allStories.map((s) => {
     const isActive = session.activeStoryId === s.id;
     const slice = isActive ? votes : (inactiveStoryLatestVotes.get(s.id) ?? []);
@@ -119,5 +128,7 @@ export function buildPlanningRoomViewModel(
     localVote,
     canReveal,
     canResetRound,
+    everyoneActiveVoted,
+    roundTimer: session.roundTimer,
   };
 }

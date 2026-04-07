@@ -11,12 +11,16 @@ import {
   writeBatch,
 } from '@angular/fire/firestore';
 import { Observable, defer, from, map, of } from 'rxjs';
-import { Session } from '@app/core/models';
+import { DEFAULT_ROUND_TIMER_DURATION_SEC, Session } from '@app/core/models';
 import { SESSIONS_COLLECTION } from '@app/data/firebase/firestore-paths';
 import { mapSessionDocument, mapSessionSnapshot } from '@app/data/mappers/session-doc.mapper';
 import { cardsForDeckPreset } from '@app/shared/utils/deck-presets';
 import { generateEntityId, generateSessionId } from '@app/shared/utils/id.utils';
-import { CreateSessionAsModeratorParams, SessionRepository } from './session.repository';
+import {
+  CreateSessionAsModeratorParams,
+  SessionRepository,
+  SessionRoundTimerPatch,
+} from './session.repository';
 
 @Injectable({ providedIn: 'root' })
 export class FirestoreSessionRepository implements SessionRepository {
@@ -64,6 +68,10 @@ export class FirestoreSessionRepository implements SessionRepository {
     );
   }
 
+  patchRoundTimer(sessionId: string, patch: SessionRoundTimerPatch): Observable<void> {
+    return defer(() => from(this.commitPatchRoundTimer(sessionId.trim(), patch)));
+  }
+
   private async commitReveal(sessionId: string, revealedByMemberId: string): Promise<void> {
     const ref = doc(this.firestore, SESSIONS_COLLECTION, sessionId);
     await updateDoc(ref, {
@@ -81,6 +89,8 @@ export class FirestoreSessionRepository implements SessionRepository {
       'revealState.revealedAt': null,
       'revealState.revealedByMemberId': null,
       'revealState.roundEpoch': increment(1),
+      'roundTimer.isRunning': false,
+      'roundTimer.startedAt': null,
       updatedAt: serverTimestamp(),
     });
   }
@@ -102,6 +112,8 @@ export class FirestoreSessionRepository implements SessionRepository {
     batch.update(sessionRef, {
       activeStoryId: newStoryId,
       revealState,
+      'roundTimer.isRunning': false,
+      'roundTimer.startedAt': null,
       updatedAt: serverTimestamp(),
     });
 
@@ -146,6 +158,11 @@ export class FirestoreSessionRepository implements SessionRepository {
       },
       activeStoryId: storyId,
       revealState,
+      roundTimer: {
+        durationSec: DEFAULT_ROUND_TIMER_DURATION_SEC,
+        isRunning: false,
+        startedAt: null,
+      },
     });
 
     const memberRef = doc(
@@ -176,5 +193,20 @@ export class FirestoreSessionRepository implements SessionRepository {
 
     await batch.commit();
     return sessionId;
+  }
+
+  private async commitPatchRoundTimer(sessionId: string, patch: SessionRoundTimerPatch): Promise<void> {
+    const ref = doc(this.firestore, SESSIONS_COLLECTION, sessionId);
+    const updates: DocumentData = { updatedAt: serverTimestamp() };
+    if (patch.durationSec !== undefined) {
+      updates['roundTimer.durationSec'] = patch.durationSec;
+    }
+    if (patch.isRunning !== undefined) {
+      updates['roundTimer.isRunning'] = patch.isRunning;
+    }
+    if (patch.startedAt !== undefined) {
+      updates['roundTimer.startedAt'] = patch.startedAt;
+    }
+    await updateDoc(ref, updates as DocumentData);
   }
 }

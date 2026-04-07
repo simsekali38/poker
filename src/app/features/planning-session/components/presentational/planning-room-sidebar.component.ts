@@ -1,4 +1,5 @@
 import { Component, input, output } from '@angular/core';
+import { UiPanelComponent } from '@app/shared/ui/design-system';
 import { PlanningRoomViewModel } from '../../models/planning-room.view-model';
 import { RoomParticipantListComponent } from './room-participant-list.component';
 import { RoomStoryHistoryComponent } from './room-story-history.component';
@@ -6,14 +7,18 @@ import { RoomStoryHistoryComponent } from './room-story-history.component';
 @Component({
   selector: 'app-planning-room-sidebar',
   standalone: true,
-  imports: [RoomParticipantListComponent, RoomStoryHistoryComponent],
+  imports: [UiPanelComponent, RoomParticipantListComponent, RoomStoryHistoryComponent],
   template: `
     <aside class="sidebar" aria-label="Session sidebar">
-      <section class="sidebar-card" aria-labelledby="participants-heading">
-        <h2 id="participants-heading" class="sidebar-card__title">Participants</h2>
+      <app-ui-panel
+        title="Participants"
+        [compact]="true"
+        [hover]="true"
+        [labelledBy]="'participants-heading'"
+      >
         <app-room-participant-list [rows]="vm().participants" [votesRevealed]="vm().votesRevealed" />
-      </section>
-      <section class="sidebar-card" aria-label="Stories">
+      </app-ui-panel>
+      <div class="sidebar__stories" aria-label="Stories">
         <app-room-story-history
           [rows]="vm().storyHistoryRows"
           [isModerator]="vm().isModerator"
@@ -21,7 +26,7 @@ import { RoomStoryHistoryComponent } from './room-story-history.component';
           (switchStory)="switchStory.emit($event)"
           (createStory)="createStory.emit($event)"
         />
-      </section>
+      </div>
     </aside>
   `,
   styleUrl: './planning-room-sidebar.component.scss',

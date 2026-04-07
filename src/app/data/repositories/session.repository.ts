@@ -2,6 +2,14 @@ import { Observable } from 'rxjs';
 import { DeckPresetId } from '@app/core/models';
 import { Session } from '@app/core/models';
 
+/** Partial update for `session.roundTimer.*` (Firestore dot paths). */
+export interface SessionRoundTimerPatch {
+  durationSec?: number;
+  isRunning?: boolean;
+  /** Use Firestore `serverTimestamp()` when starting; `null` when clearing. */
+  startedAt?: unknown;
+}
+
 export interface CreateSessionAsModeratorParams {
   sessionTitle: string;
   moderatorDisplayName: string;
@@ -45,4 +53,7 @@ export interface SessionRepository {
     newStoryId: string,
     previousActiveStoryId: string | null,
   ): Observable<void>;
+
+  /** Updates nested `roundTimer` fields (moderator-only in rules). */
+  patchRoundTimer(sessionId: string, patch: SessionRoundTimerPatch): Observable<void>;
 }

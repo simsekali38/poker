@@ -1,6 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 module.exports = {
-  content: ['./src/**/*.{html,ts,scss}'],
+  /**
+   * Angular: class names live in HTML and inline `template` / `templateUrl` on `.ts` files.
+   * Include `index.html`. Omit raw `.scss` so arbitrary strings in styles don't inflate the CSS
+   * bundle or miss real templates.
+   */
+  content: ['./src/index.html', './src/**/*.html', './src/**/*.ts'],
   corePlugins: {
     preflight: false,
   },

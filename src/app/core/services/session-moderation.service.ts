@@ -1,4 +1,6 @@
 import { Injectable, inject } from '@angular/core';
+import { serverTimestamp } from '@angular/fire/firestore';
+import { DEFAULT_ROUND_TIMER_DURATION_SEC } from '@app/core/models';
 import { Observable, concatMap, of, switchMap, throwError } from 'rxjs';
 import { SESSION_REPOSITORY, STORY_REPOSITORY, VOTE_REPOSITORY } from '@app/core/tokens/repository.tokens';
 import { CreateSessionStoryParams } from '@app/data/repositories/story.repository';
@@ -159,6 +161,96 @@ export class SessionModerationService {
   /**
    * Make an existing story the active voting target with a fresh hidden round.
    */
+  /** Start countdown from now (server time). Idempotent if already running. */
+  startRoundTimer(sessionId: string, moderatorUid: string): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        return this.sessions.patchRoundTimer(sid, {
+          isRunning: true,
+          startedAt: serverTimestamp(),
+        });
+      }),
+    );
+  }
+
+  stopRoundTimer(sessionId: string, moderatorUid: string): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        return this.sessions.patchRoundTimer(sid, {
+          isRunning: false,
+          startedAt: null,
+        });
+      }),
+    );
+  }
+
+  /**
+   * Stop timer and clear start time. Optionally reset duration to default (60s).
+   */
+  resetRoundTimer(sessionId: string, moderatorUid: string, resetDuration = false): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        return this.sessions.patchRoundTimer(sid, {
+          isRunning: false,
+          startedAt: null,
+          ...(resetDuration ? { durationSec: DEFAULT_ROUND_TIMER_DURATION_SEC } : {}),
+        });
+      }),
+    );
+  }
+
+  setRoundTimerDuration(sessionId: string, moderatorUid: string, durationSec: number): Observable<void> {
+    const sid = sessionId.trim();
+    const d = Math.min(3600, Math.max(10, Math.round(durationSec)));
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        return this.sessions.patchRoundTimer(sid, { durationSec: d });
+      }),
+    );
+  }
+
   switchActiveStory(sessionId: string, moderatorUid: string, storyId: string): Observable<void> {
     const sid = sessionId.trim();
     const nextId = storyId.trim();

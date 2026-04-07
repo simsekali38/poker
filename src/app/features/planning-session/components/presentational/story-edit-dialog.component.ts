@@ -1,10 +1,11 @@
 import { Component, ElementRef, output, viewChild } from '@angular/core';
 import { FormControl, FormGroup, ReactiveFormsModule, Validators } from '@angular/forms';
+import { UiButtonDirective } from '@app/shared/ui/design-system';
 
 @Component({
   selector: 'app-story-edit-dialog',
   standalone: true,
-  imports: [ReactiveFormsModule],
+  imports: [ReactiveFormsModule, UiButtonDirective],
   templateUrl: './story-edit-dialog.component.html',
   styleUrl: './story-edit-dialog.component.scss',
 })

@@ -5,38 +5,48 @@ function numericFromCard(card: VoteCard): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+function cardKey(card: VoteCard): string {
+  return String(card);
+}
+
 /**
- * Members whose numeric vote falls outside [Q1 - 1.5×IQR, Q3 + 1.5×IQR].
- * Empty when fewer than 3 numeric votes or IQR is 0.
+ * Outliers = numeric votes whose **index in `deckOrder`** is at least `minStepsFromMedian`
+ * away from the **median index** (among numeric votes only). Non-numeric cards are ignored.
+ *
+ * Example: deck [1,2,3,5,8,13], votes 3,5,13 → median index ~2 (value 5). Value 13 is several steps away → outlier.
  */
-export function outlierMemberIds(rows: readonly { memberId: string; card: VoteCard }[]): Set<string> {
-  const numeric = rows
-    .map((r) => ({ memberId: r.memberId, v: numericFromCard(r.card) }))
-    .filter((r): r is { memberId: string; v: number } => r.v !== null);
-  if (numeric.length < 3) {
-    return new Set();
-  }
-  const values = numeric.map((r) => r.v).sort((a, b) => a - b);
-  const q = (p: number) => {
-    const idx = (values.length - 1) * p;
-    const lo = Math.floor(idx);
-    const hi = Math.ceil(idx);
-    if (lo === hi) {
-      return values[lo];
+export function outlierMemberIdsByMedianDeckDistance(
+  rows: readonly { memberId: string; card: VoteCard }[],
+  deckOrder: readonly VoteCard[],
+  minStepsFromMedian = 2,
+): Set<string> {
+  const indexed: { memberId: string; deckIndex: number }[] = [];
+  for (const r of rows) {
+    const n = numericFromCard(r.card);
+    if (n === null) {
+      continue;
     }
-    return values[lo] + (values[hi] - values[lo]) * (idx - lo);
-  };
-  const q1 = q(0.25);
-  const q3 = q(0.75);
-  const iqr = q3 - q1;
-  if (iqr <= 0) {
+    const key = cardKey(r.card);
+    const deckIndex = deckOrder.findIndex((c) => cardKey(c) === key);
+    if (deckIndex < 0) {
+      continue;
+    }
+    indexed.push({ memberId: r.memberId, deckIndex });
+  }
+  if (indexed.length === 0) {
     return new Set();
   }
-  const low = q1 - 1.5 * iqr;
-  const high = q3 + 1.5 * iqr;
+  const sorted = [...indexed].sort((a, b) => a.deckIndex - b.deckIndex);
+  const mid = Math.floor(sorted.length / 2);
+  let medianDeckIndex: number;
+  if (sorted.length % 2 === 1) {
+    medianDeckIndex = sorted[mid].deckIndex;
+  } else {
+    medianDeckIndex = Math.round((sorted[mid - 1].deckIndex + sorted[mid].deckIndex) / 2);
+  }
   const out = new Set<string>();
-  for (const r of numeric) {
-    if (r.v < low || r.v > high) {
+  for (const r of indexed) {
+    if (Math.abs(r.deckIndex - medianDeckIndex) >= minStepsFromMedian) {
       out.add(r.memberId);
     }
   }

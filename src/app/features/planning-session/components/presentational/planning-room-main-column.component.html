@@ -1,0 +1,90 @@
+<section class="planning-main" aria-label="Voting">
+  <div class="planning-main__story">
+    <app-story-panel
+      [story]="vm().story"
+      [canEdit]="vm().canEditActiveStory"
+      (editRequest)="editStory.emit()"
+    />
+  </div>
+
+  <div class="planning-main__timer">
+    <app-room-circular-timer
+      [remainingSec]="sessionStore.roundTimerRemainingSec()"
+      [durationSec]="vm().roundTimer.durationSec"
+      [isRunning]="vm().roundTimer.isRunning"
+      [isModerator]="vm().isModerator"
+      [busy]="sessionStore.timerBusy()"
+      (start)="sessionStore.startRoundTimer()"
+      (stop)="sessionStore.stopRoundTimer()"
+      (reset)="sessionStore.resetRoundTimer()"
+      (durationChange)="sessionStore.setRoundTimerDuration($event)"
+    />
+  </div>
+
+  <div class="planning-main__progress">
+    <app-ui-panel title="Round progress" [hover]="true" [labelledBy]="'round-progress-h'">
+      <app-room-voting-status
+        [votedCount]="vm().votedCount"
+        [participantCount]="vm().participantCount"
+        [votesRevealed]="vm().votesRevealed"
+      />
+    </app-ui-panel>
+  </div>
+
+  <div class="planning-main__vote">
+    <app-ui-panel title="Your vote" [hover]="true" [labelledBy]="'your-vote-h'">
+      <app-room-everyone-voted-banner
+        [everyoneActiveVoted]="vm().everyoneActiveVoted"
+        [votesRevealed]="vm().votesRevealed"
+        [hasActiveStory]="!!vm().activeStoryId"
+      />
+      <app-voting-card-grid
+        [cards]="vm().deck"
+        [selectedCard]="vm().localVote"
+        [disabled]="!vm().canVote || voteSubmitBusy()"
+        [votesRevealed]="vm().votesRevealed"
+        [presentation]="vm().votesRevealed ? 'revealed' : 'picker'"
+        (cardPicked)="cardPicked.emit($event)"
+      />
+      @if (
+        vm().sessionStatus === 'active' && !vm().canVote && vm().activeStoryId && !vm().votesRevealed
+      ) {
+        <p class="ui-section-helper m-0 mt-3">
+          Join this session with your display name to vote, or wait for the next round.
+        </p>
+      }
+    </app-ui-panel>
+  </div>
+
+  <div class="planning-main__moderate">
+    <app-ui-panel
+      [title]="vm().isModerator ? 'Moderator controls' : 'Reveal'"
+      [hover]="true"
+      [labelledBy]="'moderator-controls-h'"
+    >
+      @if (vm().isModerator) {
+        <p class="ui-section-helper mb-2 mt-0">Run the round after everyone has picked a card.</p>
+      }
+      <app-reveal-controls
+        [isModerator]="vm().isModerator"
+        [votesRevealed]="vm().votesRevealed"
+        [canReveal]="vm().canReveal"
+        [canResetRound]="vm().canResetRound"
+        [votesReadyToReveal]="vm().isModerator && vm().everyoneActiveVoted && !vm().votesRevealed"
+        [busy]="moderationBusy()"
+        (reveal)="reveal.emit()"
+        (resetRound)="resetRound.emit()"
+      />
+    </app-ui-panel>
+  </div>
+
+  <div class="planning-main__results">
+    <app-room-results-panel
+      [rows]="vm().results"
+      [deck]="vm().deck"
+      [numericAverage]="vm().numericAverage"
+      [votesRevealed]="vm().votesRevealed"
+      [hasActiveStory]="!!vm().activeStoryId"
+    />
+  </div>
+</section>

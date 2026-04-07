@@ -3,6 +3,7 @@ export * from './user-identity.model';
 export * from './vote-card.model';
 export * from './session-settings.model';
 export * from './reveal-state.model';
+export * from './round-timer.model';
 export * from './session.model';
 export * from './session-member.model';
 export * from './story.model';

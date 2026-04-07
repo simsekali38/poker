@@ -1,13 +1,15 @@
 import { Component, input, output } from '@angular/core';
+import { UiButtonDirective } from '@app/shared/ui/design-system';
 
 @Component({
   selector: 'app-planning-room-error-banner',
   standalone: true,
+  imports: [UiButtonDirective],
   template: `
     @if (message(); as err) {
       <div class="banner banner--error" role="alert">
         <span class="banner__text">{{ err }}</span>
-        <button type="button" class="banner__dismiss" (click)="dismiss.emit()">Dismiss</button>
+        <button type="button" uiBtn="secondary" uiBtnSize="sm" (click)="dismiss.emit()">Dismiss</button>
       </div>
     }
   `,

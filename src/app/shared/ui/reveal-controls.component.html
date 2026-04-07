@@ -1,39 +1,30 @@
 @if (isModerator()) {
   <div
-    [class]="
-      'flex flex-col gap-4 rounded-card-sm border transition-all duration-200 ' +
-      (votesReadyToReveal() && !votesRevealed()
-        ? 'border-primary/20 bg-primary/[0.06] p-4 shadow-sm'
-        : 'border-transparent')
-    "
+    class="mod-controls"
+    [class.mod-controls--ready]="votesReadyToReveal() && !votesRevealed()"
     role="group"
     aria-label="Moderator voting controls"
   >
     @if (votesReadyToReveal() && !votesRevealed()) {
-      <p
-        class="flex items-start gap-3 rounded-card-sm border border-primary/20 bg-primary/[0.08] p-3 text-sm font-semibold leading-snug text-ink"
-        role="status"
-      >
-        <span
-          class="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-success shadow-[0_0_0_3px_rgba(34,197,94,0.2)]"
-          aria-hidden="true"
-        ></span>
+      <p class="mod-controls__banner" role="status">
+        <span class="mod-controls__dot" aria-hidden="true"></span>
         Everyone has voted — you can reveal results.
       </p>
     }
-    <div class="flex flex-wrap items-center gap-4">
+    <div class="mod-controls__actions">
       <button
         type="button"
-        class="ui-focus-ring min-h-[2.75rem] rounded-card-sm border border-transparent bg-primary px-6 py-3 text-sm font-semibold text-white shadow-card transition-all duration-180 hover:bg-primary-hover hover:shadow-card-md active:scale-[0.98] active:bg-primary-active disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+        uiBtn="primary"
         (click)="onReveal()"
         [disabled]="!canReveal() || busy()"
+        [uiBtnLoading]="busy()"
         [attr.aria-busy]="busy() ? 'true' : null"
       >
         Reveal votes
       </button>
       <button
         type="button"
-        class="ui-focus-ring min-h-[2.75rem] rounded-card-sm border border-line bg-surface px-5 py-3 text-sm font-semibold text-ink shadow-card transition-all duration-180 hover:border-muted/40 hover:bg-canvas hover:shadow-card-md active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-45 disabled:shadow-none"
+        uiBtn="secondary"
         (click)="onReset()"
         [disabled]="!canResetRound() || busy()"
       >
@@ -41,15 +32,11 @@
       </button>
     </div>
     @if (votesRevealed()) {
-      <p class="m-0 text-xs leading-relaxed text-muted opacity-90">
-        Votes are visible. Reset starts a new round for this story.
-      </p>
+      <p class="mod-controls__hint">Votes are visible. Reset starts a new round for this story.</p>
     } @else {
-      <p class="m-0 text-xs leading-relaxed text-muted opacity-90">
-        Reveal to show everyone’s cards and the numeric average.
-      </p>
+      <p class="mod-controls__hint">Reveal to show everyone’s cards and the numeric average.</p>
     }
   </div>
 } @else {
-  <p class="m-0 text-sm leading-relaxed text-muted">Waiting for the moderator to reveal results.</p>
+  <p class="mod-controls__observer">Waiting for the moderator to reveal results.</p>
 }

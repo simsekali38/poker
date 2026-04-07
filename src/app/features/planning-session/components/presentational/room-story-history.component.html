@@ -1,37 +1,35 @@
-<section
-  class="history"
-  aria-labelledby="stories-heading"
-  [attr.aria-busy]="busy() ? 'true' : null"
->
-  <div class="history__head">
-    <h2 id="stories-heading" class="history__title">Stories</h2>
+<app-ui-panel [compact]="true" [ariaBusy]="busy()">
+  <header uiPanelHeader class="history__head">
+    <h2 id="stories-heading" class="ui-section-title">Stories</h2>
     @if (isModerator()) {
       <button
         type="button"
         class="history__toggle"
+        uiBtn="ghost"
+        uiBtnSize="sm"
         [attr.aria-expanded]="addFormOpen()"
         (click)="toggleAddForm()"
       >
         {{ addFormOpen() ? 'Hide' : 'Add story' }}
       </button>
     }
-  </div>
+  </header>
 
   @if (isModerator() && addFormOpen()) {
     <form class="history__form" [formGroup]="createForm" (ngSubmit)="submitNew()">
       <label class="field">
         <span class="field__label">Title</span>
-        <input class="field__input" type="text" formControlName="title" autocomplete="off" />
+        <input class="ui-input" type="text" formControlName="title" autocomplete="off" />
       </label>
       <label class="field">
         <span class="field__label">Description <span class="optional">(optional)</span></span>
-        <textarea class="field__input field__textarea" formControlName="description" rows="2"></textarea>
+        <textarea class="ui-input field__textarea" formControlName="description" rows="2"></textarea>
       </label>
       <label class="check">
         <input type="checkbox" formControlName="makeActive" />
         <span>Set as current story</span>
       </label>
-      <button type="submit" class="btn primary" [disabled]="busy() || createForm.invalid">
+      <button type="submit" uiBtn="primary" [disabled]="busy() || createForm.invalid" [uiBtnLoading]="busy()">
         Create story
       </button>
     </form>
@@ -46,7 +44,7 @@
           <div class="history__row">
             <div class="history__main">
               @if (row.isActive) {
-                <span class="pill" aria-label="Currently voting">Active</span>
+                <span class="ui-badge ui-badge--solid" aria-label="Currently voting">Active</span>
               }
               <span class="history__story-title">{{ row.title }}</span>
             </div>
@@ -56,12 +54,7 @@
             </div>
           </div>
           @if (isModerator() && !row.isActive) {
-            <button
-              type="button"
-              class="btn ghost"
-              [disabled]="busy()"
-              (click)="onSwitch(row)"
-            >
+            <button type="button" uiBtn="secondary" uiBtnSize="sm" [disabled]="busy()" (click)="onSwitch(row)">
               Open for voting
             </button>
           }
@@ -73,4 +66,4 @@
   @if (!isModerator()) {
     <p class="history__hint">Only the moderator can add or switch stories.</p>
   }
-</section>
+</app-ui-panel>

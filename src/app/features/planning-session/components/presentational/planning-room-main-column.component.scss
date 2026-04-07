@@ -1,0 +1,51 @@
+.planning-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+@media (min-width: 1024px) {
+  .planning-main {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    grid-template-areas:
+      'story timer'
+      'progress timer'
+      'vote mod'
+      'results results';
+    align-items: start;
+    column-gap: var(--space-5);
+    row-gap: var(--space-4);
+  }
+
+  .planning-main__story {
+    grid-area: story;
+  }
+
+  .planning-main__timer {
+    grid-area: timer;
+    position: sticky;
+    top: var(--space-4);
+  }
+
+  .planning-main__progress {
+    grid-area: progress;
+  }
+
+  .planning-main__vote {
+    grid-area: vote;
+  }
+
+  .planning-main__moderate {
+    grid-area: mod;
+  }
+
+  .planning-main__results {
+    grid-area: results;
+  }
+}
+
+.planning-main__moderate .ui-section-helper {
+  margin-top: 0;
+}

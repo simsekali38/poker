@@ -11,9 +11,11 @@ import {
   concat,
   distinctUntilChanged,
   filter,
+  interval,
   map,
   of,
   shareReplay,
+  startWith,
   switchMap,
   take,
   finalize,
@@ -33,6 +35,7 @@ import {
   inactiveVotesCoordinationKey,
   voteRoundCoordinationKey,
 } from './planning-room-stream.utils';
+import { roundTimerRemainingSec as computeRoundTimerRemaining } from '@app/shared/utils/round-timer-remaining.util';
 
 type RoomStreamState =
   | { kind: 'loading' }
@@ -55,6 +58,20 @@ export class PlanningSessionStore {
   readonly moderationBusy = signal(false);
   readonly storyActionBusy = signal(false);
   readonly voteSubmitBusy = signal(false);
+  readonly timerBusy = signal(false);
+
+  /** Ticks once per second so `roundTimerRemainingSec` stays current while the room is open. */
+  private readonly timerClock = toSignal(interval(1000).pipe(startWith(0)), { initialValue: 0 });
+
+  /** Remaining seconds while `roundTimer.isRunning`; `null` when stopped. */
+  readonly roundTimerRemainingSec = computed(() => {
+    this.timerClock();
+    const vm = this.roomView();
+    if (!vm) {
+      return null;
+    }
+    return computeRoundTimerRemaining(vm.roundTimer, Date.now());
+  });
 
   /** Single shared param stream — avoids duplicate `ActivatedRoute` subscriptions. */
   private readonly sessionId$ = this.route.paramMap.pipe(
@@ -240,6 +257,86 @@ export class PlanningSessionStore {
       .pipe(
         take(1),
         finalize(() => this.moderationBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  startRoundTimer(): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!vm?.isModerator || !uid || !sid || this.timerBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.timerBusy.set(true);
+    this.moderation
+      .startRoundTimer(sid, uid)
+      .pipe(
+        take(1),
+        finalize(() => this.timerBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  stopRoundTimer(): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!vm?.isModerator || !uid || !sid || this.timerBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.timerBusy.set(true);
+    this.moderation
+      .stopRoundTimer(sid, uid)
+      .pipe(
+        take(1),
+        finalize(() => this.timerBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  resetRoundTimer(): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!vm?.isModerator || !uid || !sid || this.timerBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.timerBusy.set(true);
+    this.moderation
+      .resetRoundTimer(sid, uid, true)
+      .pipe(
+        take(1),
+        finalize(() => this.timerBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  setRoundTimerDuration(durationSec: number): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!vm?.isModerator || !uid || !sid || this.timerBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.timerBusy.set(true);
+    this.moderation
+      .setRoundTimerDuration(sid, uid, durationSec)
+      .pipe(
+        take(1),
+        finalize(() => this.timerBusy.set(false)),
       )
       .subscribe({
         error: (err: unknown) => this.setActionErrorFromUnknown(err),

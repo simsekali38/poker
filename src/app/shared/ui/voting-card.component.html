@@ -1,7 +1,7 @@
 <button
   type="button"
   [class]="buttonClasses()"
-  [class.animate-vote-pulse]="votePulse() && state() === 'selected'"
+  [class.vote-deck-card--pulse]="votePulse() && state() === 'selected'"
   [attr.tabindex]="effectiveTabIndex()"
   [attr.aria-disabled]="isDisabled() ? true : null"
   [attr.aria-pressed]="isDisabled() ? null : isSelectedLike()"
@@ -9,5 +9,5 @@
   (click)="select()"
   (keydown)="onButtonKeydown($event)"
 >
-  <span class="block select-none text-center pointer-events-none">{{ label() }}</span>
+  <span class="vote-deck-card__label">{{ label() }}</span>
 </button>

@@ -10,17 +10,6 @@ import {
 } from '@angular/core';
 import { VotingCardState } from './voting-card.types';
 
-const VOTE_BTN_BASE =
-  'w-full min-h-[4.5rem] min-w-[4.5rem] aspect-square inline-flex items-center justify-center rounded-card border text-base font-semibold tabular-nums touch-manipulation transition-all duration-180 ease-out ui-focus-ring disabled:pointer-events-none disabled:opacity-[0.48] disabled:shadow-sm';
-
-/** Full literal strings so Tailwind JIT can detect utilities in this `.ts` file. */
-const VOTE_STATE_CLASSES: Record<VotingCardState, string> = {
-  default: `${VOTE_BTN_BASE} cursor-pointer border-black/[0.06] bg-surface text-ink shadow-card hover:scale-[1.04] hover:border-primary/20 hover:shadow-card-md active:scale-[0.96]`,
-  selected: `${VOTE_BTN_BASE} cursor-pointer border-transparent bg-primary text-white shadow-card-md ring-1 ring-primary/25 hover:scale-[1.03] hover:bg-primary-hover hover:shadow-card-lg active:scale-[0.97] active:bg-primary-active`,
-  revealed: `${VOTE_BTN_BASE} cursor-pointer border-transparent bg-success text-white shadow-card-md ring-1 ring-success/30 hover:scale-[1.03] hover:shadow-card-lg hover:brightness-95 active:scale-[0.97] active:brightness-90`,
-  disabled: `${VOTE_BTN_BASE} cursor-not-allowed border-black/[0.06] bg-surface text-ink shadow-sm`,
-};
-
 @Component({
   selector: 'app-voting-card',
   standalone: true,
@@ -34,12 +23,16 @@ export class VotingCardComponent {
   readonly label = input.required<string>();
   readonly state = input<VotingCardState>('default');
   readonly focusTabIndex = input(0);
+  /** Incremented on each reveal transition; used to fire Web Animations once per reveal. */
+  readonly revealWave = input(0);
+  readonly staggerIndex = input(0);
   readonly pick = output<void>();
   readonly deckNavigationKey = output<KeyboardEvent>();
 
   protected readonly votePulse = signal(false);
   private pulseTimer: ReturnType<typeof setTimeout> | undefined;
   private wasSelected = false;
+  private lastRevealWaveAnimated = 0;
 
   constructor() {
     this.destroyRef.onDestroy(() => clearTimeout(this.pulseTimer));
@@ -52,10 +45,44 @@ export class VotingCardComponent {
       }
       this.wasSelected = sel;
     });
+
+    effect(() => {
+      const wave = this.revealWave();
+      const st = this.state();
+      if (st !== 'revealed') {
+        this.lastRevealWaveAnimated = 0;
+        return;
+      }
+      if (wave === 0 || wave <= this.lastRevealWaveAnimated) {
+        return;
+      }
+      this.lastRevealWaveAnimated = wave;
+      queueMicrotask(() => this.playRevealFlip());
+    });
+  }
+
+  private playRevealFlip(): void {
+    const btn = this.el.nativeElement.querySelector('button');
+    if (!btn || typeof btn.animate !== 'function') {
+      return;
+    }
+    const delay = this.staggerIndex() * 70;
+    btn.animate(
+      [
+        { opacity: 0.25, transform: 'scale(0.88) perspective(420px) rotateY(-14deg)' },
+        { opacity: 1, transform: 'scale(1) perspective(420px) rotateY(0deg)' },
+      ],
+      {
+        duration: 440,
+        delay,
+        easing: 'cubic-bezier(0.33, 1, 0.68, 1)',
+        fill: 'both',
+      },
+    );
   }
 
   protected buttonClasses(): string {
-    return VOTE_STATE_CLASSES[this.state()];
+    return `vote-deck-card vote-deck-card--${this.state()}`;
   }
 
   focusCard(): void {

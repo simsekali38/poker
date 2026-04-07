@@ -1,4 +1,4 @@
-import { SessionStatus, Story, VoteCard } from '@app/core/models';
+import { RoundTimerState, SessionStatus, Story, VoteCard } from '@app/core/models';
 
 export interface ParticipantRowVm {
   memberId: string;
@@ -62,4 +62,10 @@ export interface PlanningRoomViewModel {
   canReveal: boolean;
   /** Moderator may reset: clear round votes, hide, bump epoch; members/story unchanged. */
   canResetRound: boolean;
+
+  /** All online members have a vote while the round is hidden (see `everyoneActiveOnlineHasVoted`). */
+  everyoneActiveVoted: boolean;
+
+  /** Firestore-backed round timer; remaining seconds are derived in the store with a 1s ticker. */
+  roundTimer: RoundTimerState;
 }

@@ -1,8 +1,10 @@
 import { Component, input, output } from '@angular/core';
+import { UiButtonDirective } from '@app/shared/ui/design-system';
 
 @Component({
   selector: 'app-session-header',
   standalone: true,
+  imports: [UiButtonDirective],
   templateUrl: './session-header.component.html',
   styleUrl: './session-header.component.scss',
 })
