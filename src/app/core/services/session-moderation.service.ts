@@ -1,9 +1,11 @@
 import { Injectable, inject } from '@angular/core';
 import { serverTimestamp } from '@angular/fire/firestore';
-import { DEFAULT_ROUND_TIMER_DURATION_SEC } from '@app/core/models';
+import { DEFAULT_ROUND_TIMER_DURATION_SEC, FinalEstimateMethod, VoteCard } from '@app/core/models';
 import { Observable, concatMap, of, switchMap, throwError } from 'rxjs';
 import { SESSION_REPOSITORY, STORY_REPOSITORY, VOTE_REPOSITORY } from '@app/core/tokens/repository.tokens';
 import { CreateSessionStoryParams } from '@app/data/repositories/story.repository';
+import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
+import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
 
 export type SessionModerationFailure =
   | 'SESSION_NOT_FOUND'
@@ -11,7 +13,11 @@ export type SessionModerationFailure =
   | 'NO_ACTIVE_STORY'
   | 'SESSION_NOT_ACTIVE'
   | 'STORY_NOT_FOUND'
-  | 'INVALID_STORY_TITLE';
+  | 'INVALID_STORY_TITLE'
+  | 'ROUND_NOT_REVEALED'
+  | 'INVALID_JIRA_ISSUE_KEY'
+  | 'INVALID_JIRA_SITE'
+  | 'INVALID_JIRA_BOARD_ID';
 
 @Injectable({ providedIn: 'root' })
 export class SessionModerationService {
@@ -76,6 +82,9 @@ export class SessionModerationService {
         const epoch = session.revealState.roundEpoch;
         return this.votes.deleteVotesForStoryRound(sid, storyId, epoch).pipe(
           concatMap(() => this.sessions.resetVotingRound(sid)),
+          concatMap(() =>
+            this.stories.updateStory(sid, storyId, { clearFinalEstimateState: true }),
+          ),
         );
       }),
     );
@@ -251,6 +260,164 @@ export class SessionModerationService {
     );
   }
 
+  /**
+   * Persist moderator’s chosen final estimate (post-reveal) on the active story.
+   */
+  setActiveStoryFinalEstimate(
+    sessionId: string,
+    moderatorUid: string,
+    input: { method: FinalEstimateMethod; card: VoteCard },
+  ): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        const storyId = session.activeStoryId;
+        if (!storyId) {
+          return throwError(() => this.err('NO_ACTIVE_STORY'));
+        }
+        if (!session.revealState.revealed) {
+          return throwError(() => this.err('ROUND_NOT_REVEALED'));
+        }
+        return this.stories.updateStory(sid, storyId, {
+          finalEstimateMethod: input.method,
+          finalEstimateCard: input.card,
+        });
+      }),
+    );
+  }
+
+  /**
+   * Persist Jira site / connected flag for the session (moderator only).
+   * Pass a normalized site URL from the UI, or `null` to clear.
+   */
+  updateSessionJiraSettings(
+    sessionId: string,
+    moderatorUid: string,
+    input: { jiraSiteUrl: string | null; jiraConnected: boolean },
+  ): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    const site = input.jiraSiteUrl === null ? null : normalizeJiraSiteUrl(input.jiraSiteUrl);
+    if (input.jiraSiteUrl !== null && input.jiraSiteUrl.trim() !== '' && site === null) {
+      return throwError(() => this.err('INVALID_JIRA_SITE'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        return this.sessions.patchJiraSettings(sid, {
+          jiraSiteUrl: site,
+          jiraConnected: input.jiraConnected || Boolean(site),
+        });
+      }),
+    );
+  }
+
+  /**
+   * Sets `settings.jiraBoardId` for Agile board estimation (moderator only).
+   * Empty string clears. Value must be numeric (Jira board id).
+   */
+  updateSessionJiraBoardId(sessionId: string, moderatorUid: string, rawBoardId: string): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    const trimmed = rawBoardId.trim();
+    const boardId = trimmed === '' ? null : trimmed;
+    if (boardId !== null && !/^\d+$/.test(boardId)) {
+      return throwError(() => this.err('INVALID_JIRA_BOARD_ID'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        return this.sessions.patchJiraSettings(sid, { jiraBoardId: boardId });
+      }),
+    );
+  }
+
+  /** Sets `jiraIssueKey` on the active story (moderator only). Empty string clears the key. */
+  setActiveStoryJiraIssueKey(sessionId: string, moderatorUid: string, rawIssueKey: string): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    const trimmed = rawIssueKey.trim();
+    const parsed = trimmed === '' ? null : parseJiraIssueKey(trimmed);
+    if (trimmed !== '' && parsed === null) {
+      return throwError(() => this.err('INVALID_JIRA_ISSUE_KEY'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        const storyId = session.activeStoryId;
+        if (!storyId) {
+          return throwError(() => this.err('NO_ACTIVE_STORY'));
+        }
+        return this.stories.updateStory(sid, storyId, { jiraIssueKey: parsed });
+      }),
+    );
+  }
+
+  /** Sets `jiraSyncedAt` to server time on the active story (after a successful Jira API call). */
+  markActiveStoryJiraSynced(sessionId: string, moderatorUid: string): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        const storyId = session.activeStoryId;
+        if (!storyId) {
+          return throwError(() => this.err('NO_ACTIVE_STORY'));
+        }
+        return this.stories.updateStory(sid, storyId, { markJiraSynced: true });
+      }),
+    );
+  }
+
   switchActiveStory(sessionId: string, moderatorUid: string, storyId: string): Observable<void> {
     const sid = sessionId.trim();
     const nextId = storyId.trim();
@@ -297,6 +464,14 @@ export class SessionModerationService {
         return 'That story is no longer available.';
       case 'INVALID_STORY_TITLE':
         return 'Story title cannot be empty.';
+      case 'ROUND_NOT_REVEALED':
+        return 'Reveal votes before choosing a final estimate.';
+      case 'INVALID_JIRA_ISSUE_KEY':
+        return 'Enter a valid Jira issue key (for example PROJ-123).';
+      case 'INVALID_JIRA_SITE':
+        return 'Enter a valid Jira site URL (for example https://your-team.atlassian.net).';
+      case 'INVALID_JIRA_BOARD_ID':
+        return 'Board id must be numeric (open a board in Jira and read the id from the URL).';
       default:
         return 'Action could not be completed.';
     }

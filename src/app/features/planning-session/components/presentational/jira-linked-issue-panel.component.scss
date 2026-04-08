@@ -1,0 +1,79 @@
+.jira-issue {
+  margin-bottom: var(--space-4);
+  padding: var(--space-4);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.jira-issue__title {
+  margin: 0 0 var(--space-3);
+  font: var(--font-section);
+  font-size: 0.9375rem;
+  color: var(--color-text);
+}
+
+.jira-issue__key {
+  margin: 0 0 var(--space-2);
+  font: var(--font-body);
+  font-size: 0.875rem;
+}
+
+.jira-issue__id {
+  margin-left: var(--space-2);
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+
+.jira-issue__summary {
+  margin: 0 0 var(--space-3);
+  font: 600 1rem/1.35 'Inter', system-ui, sans-serif;
+  color: var(--color-text);
+}
+
+.jira-issue__meta {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+  font: var(--font-body);
+  font-size: 0.8125rem;
+}
+
+.jira-issue__meta dt {
+  margin: 0;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.jira-issue__meta dd {
+  margin: 0;
+  color: var(--color-text);
+}
+
+.jira-issue__muted {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font: var(--font-body);
+  font-size: 0.8125rem;
+}
+
+.jira-issue__warn {
+  margin: 0;
+  color: var(--color-danger, #b42318);
+  font-size: 0.8125rem;
+}
+
+.jira-issue__details {
+  margin-top: var(--space-3);
+  font-size: 0.8125rem;
+}
+
+.jira-issue__desc {
+  margin: var(--space-2) 0 0;
+  max-height: 10rem;
+  overflow: auto;
+  white-space: pre-wrap;
+  font: var(--font-body);
+  font-size: 0.75rem;
+  color: var(--color-text-secondary);
+}

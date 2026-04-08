@@ -1,5 +1,5 @@
 import { DocumentData, DocumentSnapshot, Timestamp } from 'firebase/firestore';
-import { Story, StoryStatus } from '@app/core/models';
+import { FinalEstimateMethod, Story, StoryStatus, VoteCard } from '@app/core/models';
 
 function toDate(value: unknown): Date {
   if (value instanceof Timestamp) {
@@ -18,11 +18,23 @@ function asStoryStatus(value: unknown): StoryStatus {
   return 'active';
 }
 
+function asFinalEstimateMethod(value: unknown): FinalEstimateMethod | null {
+  if (value === 'consensus' || value === 'rounded_average' || value === 'moderator_pick') {
+    return value;
+  }
+  return null;
+}
+
+function asVoteCard(value: unknown): VoteCard | null {
+  return typeof value === 'string' ? (value as VoteCard) : null;
+}
+
 export function mapStoryDocument(storyId: string, sessionId: string, data: DocumentData): Story | null {
   const createdBy = typeof data['createdBy'] === 'string' ? data['createdBy'] : '';
   if (!createdBy) {
     return null;
   }
+  const jiraAt = data['jiraSyncedAt'];
   return {
     id: storyId,
     sessionId,
@@ -32,6 +44,10 @@ export function mapStoryDocument(storyId: string, sessionId: string, data: Docum
     createdBy,
     createdAt: toDate(data['createdAt']),
     updatedAt: toDate(data['updatedAt']),
+    finalEstimateMethod: asFinalEstimateMethod(data['finalEstimateMethod']),
+    finalEstimateCard: asVoteCard(data['finalEstimateCard']),
+    jiraSyncedAt: jiraAt ? toDate(jiraAt) : null,
+    jiraIssueKey: typeof data['jiraIssueKey'] === 'string' ? data['jiraIssueKey'] : null,
   };
 }
 

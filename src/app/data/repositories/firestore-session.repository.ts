@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import {
   DocumentData,
   Firestore,
+  deleteField,
   doc,
   docData,
   getDoc,
@@ -16,8 +17,11 @@ import { SESSIONS_COLLECTION } from '@app/data/firebase/firestore-paths';
 import { mapSessionDocument, mapSessionSnapshot } from '@app/data/mappers/session-doc.mapper';
 import { cardsForDeckPreset } from '@app/shared/utils/deck-presets';
 import { generateEntityId, generateSessionId } from '@app/shared/utils/id.utils';
+import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
+import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
 import {
   CreateSessionAsModeratorParams,
+  SessionJiraSettingsPatch,
   SessionRepository,
   SessionRoundTimerPatch,
 } from './session.repository';
@@ -70,6 +74,10 @@ export class FirestoreSessionRepository implements SessionRepository {
 
   patchRoundTimer(sessionId: string, patch: SessionRoundTimerPatch): Observable<void> {
     return defer(() => from(this.commitPatchRoundTimer(sessionId.trim(), patch)));
+  }
+
+  patchJiraSettings(sessionId: string, patch: SessionJiraSettingsPatch): Observable<void> {
+    return defer(() => from(this.commitPatchJiraSettings(sessionId.trim(), patch)));
   }
 
   private async commitReveal(sessionId: string, revealedByMemberId: string): Promise<void> {
@@ -136,6 +144,10 @@ export class FirestoreSessionRepository implements SessionRepository {
     const storyTitle = params.initialStoryTitle.trim();
     const storyId = generateEntityId();
     const deckCards = cardsForDeckPreset(params.deckPresetId);
+    const siteNorm = normalizeJiraSiteUrl(params.jiraSiteUrl ?? '');
+    const issueNorm = parseJiraIssueKey(params.initialStoryJiraIssueKey ?? '');
+    const jiraConnected =
+      Boolean(siteNorm) || params.jiraConnected === true || Boolean(issueNorm);
 
     const revealState = {
       storyId,
@@ -145,17 +157,25 @@ export class FirestoreSessionRepository implements SessionRepository {
       revealedByMemberId: null,
     };
 
+    const settings: Record<string, unknown> = {
+      deckPresetId: params.deckPresetId,
+      cards: [...deckCards],
+      allowVoteChangesBeforeReveal: true,
+    };
+    if (siteNorm) {
+      settings['jiraSiteUrl'] = siteNorm;
+    }
+    if (jiraConnected) {
+      settings['jiraConnected'] = true;
+    }
+
     batch.set(sessionRef, {
       title: params.sessionTitle.trim(),
       moderatorId: params.moderatorUid,
       status: 'active',
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
-      settings: {
-        deckPresetId: params.deckPresetId,
-        cards: [...deckCards],
-        allowVoteChangesBeforeReveal: true,
-      },
+      settings,
       activeStoryId: storyId,
       revealState,
       roundTimer: {
@@ -189,10 +209,31 @@ export class FirestoreSessionRepository implements SessionRepository {
       createdBy: params.moderatorUid,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      finalEstimateMethod: null,
+      finalEstimateCard: null,
+      jiraSyncedAt: null,
+      ...(issueNorm ? { jiraIssueKey: issueNorm } : {}),
     });
 
     await batch.commit();
     return sessionId;
+  }
+
+  private async commitPatchJiraSettings(sessionId: string, patch: SessionJiraSettingsPatch): Promise<void> {
+    const ref = doc(this.firestore, SESSIONS_COLLECTION, sessionId);
+    const updates: DocumentData = { updatedAt: serverTimestamp() };
+    if (patch.jiraSiteUrl !== undefined) {
+      updates['settings.jiraSiteUrl'] =
+        patch.jiraSiteUrl === null || patch.jiraSiteUrl === '' ? deleteField() : patch.jiraSiteUrl;
+    }
+    if (patch.jiraConnected !== undefined) {
+      updates['settings.jiraConnected'] = patch.jiraConnected;
+    }
+    if (patch.jiraBoardId !== undefined) {
+      updates['settings.jiraBoardId'] =
+        patch.jiraBoardId === null || patch.jiraBoardId === '' ? deleteField() : patch.jiraBoardId;
+    }
+    await updateDoc(ref, updates as DocumentData);
   }
 
   private async commitPatchRoundTimer(sessionId: string, patch: SessionRoundTimerPatch): Promise<void> {

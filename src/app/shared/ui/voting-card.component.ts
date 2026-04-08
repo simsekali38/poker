@@ -22,6 +22,8 @@ export class VotingCardComponent {
 
   readonly label = input.required<string>();
   readonly state = input<VotingCardState>('default');
+  /** When true, the card is not clickable (parent deck locked); still show selected/revealed styling. */
+  readonly interactionLocked = input(false);
   readonly focusTabIndex = input(0);
   /** Incremented on each reveal transition; used to fire Web Animations once per reveal. */
   readonly revealWave = input(0);
@@ -93,7 +95,7 @@ export class VotingCardComponent {
   }
 
   protected isDisabled(): boolean {
-    return this.state() === 'disabled';
+    return this.interactionLocked() || this.state() === 'disabled';
   }
 
   protected isSelectedLike(): boolean {

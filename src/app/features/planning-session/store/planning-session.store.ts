@@ -2,7 +2,11 @@ import { Injectable, computed, inject, signal } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Auth, authState } from '@angular/fire/auth';
 import { ActivatedRoute } from '@angular/router';
+import { HttpErrorResponse } from '@angular/common/http';
 import { Vote, VoteCard } from '@app/core/models';
+import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
+import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
+import { JiraPlanningIntegrationService } from '@app/core/services/jira-planning-integration.service';
 import { SessionModerationService } from '@app/core/services/session-moderation.service';
 import { isFirebasePermissionDenied } from '@app/core/utils/firebase-error.utils';
 import { isSessionModerationError } from '@app/core/utils/session-moderation-error.utils';
@@ -11,6 +15,7 @@ import {
   concat,
   distinctUntilChanged,
   filter,
+  finalize,
   interval,
   map,
   of,
@@ -18,7 +23,6 @@ import {
   startWith,
   switchMap,
   take,
-  finalize,
 } from 'rxjs';
 import {
   SESSION_MEMBER_REPOSITORY,
@@ -53,12 +57,21 @@ export class PlanningSessionStore {
   private readonly stories = inject(STORY_REPOSITORY);
   private readonly votes = inject(VOTE_REPOSITORY);
   private readonly moderation = inject(SessionModerationService);
+  private readonly jira = inject(JiraPlanningIntegrationService);
 
   readonly actionError = signal<string | null>(null);
   readonly moderationBusy = signal(false);
   readonly storyActionBusy = signal(false);
   readonly voteSubmitBusy = signal(false);
   readonly timerBusy = signal(false);
+  /** Persisting moderator final-estimate choice (Firestore). */
+  readonly finalEstimateBusy = signal(false);
+  /** POST to Jira + mark story synced. */
+  readonly jiraSubmitBusy = signal(false);
+  /** Saving Jira site / issue key on the session or story. */
+  readonly jiraMetaBusy = signal(false);
+  /** Transient success line after Jira sync. */
+  readonly jiraSyncMessage = signal<string | null>(null);
 
   /** Ticks once per second so `roundTimerRemainingSec` stays current while the room is open. */
   private readonly timerClock = toSignal(interval(1000).pipe(startWith(0)), { initialValue: 0 });
@@ -194,6 +207,224 @@ export class PlanningSessionStore {
 
   dismissActionError(): void {
     this.actionError.set(null);
+  }
+
+  clearJiraSyncMessage(): void {
+    this.jiraSyncMessage.set(null);
+  }
+
+  /** Call after OAuth redirect with `jira_site` query param (moderator). */
+  applyJiraOAuthReturn(siteFromOAuth: string): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!uid || !sid || this.jiraMetaBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.jiraMetaBusy.set(true);
+    this.moderation
+      .updateSessionJiraSettings(sid, uid, { jiraSiteUrl: siteFromOAuth, jiraConnected: true })
+      .pipe(
+        take(1),
+        finalize(() => this.jiraMetaBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  /** Persist Jira Cloud site URL for this session (moderator). */
+  saveSessionJiraSite(rawUrl: string): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!uid || !sid || this.jiraMetaBusy()) {
+      return;
+    }
+    const site = normalizeJiraSiteUrl(rawUrl);
+    if (!site) {
+      this.actionError.set(this.moderation.userMessageForFailure('INVALID_JIRA_SITE'));
+      return;
+    }
+    this.actionError.set(null);
+    this.jiraMetaBusy.set(true);
+    this.moderation
+      .updateSessionJiraSettings(sid, uid, { jiraSiteUrl: site, jiraConnected: true })
+      .pipe(
+        take(1),
+        finalize(() => this.jiraMetaBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  /** Optional Scrum board id for Jira Agile estimation (`settings.jiraBoardId`). */
+  saveSessionJiraBoardId(raw: string): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!uid || !sid || this.jiraMetaBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.jiraMetaBusy.set(true);
+    this.moderation
+      .updateSessionJiraBoardId(sid, uid, raw)
+      .pipe(
+        take(1),
+        finalize(() => this.jiraMetaBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  /** Persist Jira issue key on the active story (moderator). */
+  saveActiveStoryJiraIssueKey(raw: string): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!uid || !sid || this.jiraMetaBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.jiraMetaBusy.set(true);
+    this.moderation
+      .setActiveStoryJiraIssueKey(sid, uid, raw)
+      .pipe(
+        take(1),
+        finalize(() => this.jiraMetaBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  selectConsensusFinalEstimate(): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    const fe = vm?.finalEstimate;
+    if (!vm?.isModerator || !uid || !sid || !fe?.consensus.available || !fe.consensus.card || this.finalEstimateBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.finalEstimateBusy.set(true);
+    this.moderation
+      .setActiveStoryFinalEstimate(sid, uid, { method: 'consensus', card: fe.consensus.card })
+      .pipe(
+        take(1),
+        finalize(() => this.finalEstimateBusy.set(false)),
+      )
+      .subscribe({ error: (err: unknown) => this.setActionErrorFromUnknown(err) });
+  }
+
+  selectRoundedAverageFinalEstimate(): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    const fe = vm?.finalEstimate;
+    const rounded = fe?.average.roundedCard;
+    if (!vm?.isModerator || !uid || !sid || !fe?.average.available || !rounded || this.finalEstimateBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.finalEstimateBusy.set(true);
+    this.moderation
+      .setActiveStoryFinalEstimate(sid, uid, { method: 'rounded_average', card: rounded })
+      .pipe(
+        take(1),
+        finalize(() => this.finalEstimateBusy.set(false)),
+      )
+      .subscribe({ error: (err: unknown) => this.setActionErrorFromUnknown(err) });
+  }
+
+  selectModeratorFinalEstimate(card: VoteCard): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!vm?.isModerator || !uid || !sid || this.finalEstimateBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.finalEstimateBusy.set(true);
+    this.moderation
+      .setActiveStoryFinalEstimate(sid, uid, { method: 'moderator_pick', card })
+      .pipe(
+        take(1),
+        finalize(() => this.finalEstimateBusy.set(false)),
+      )
+      .subscribe({ error: (err: unknown) => this.setActionErrorFromUnknown(err) });
+  }
+
+  sendFinalEstimateToJira(): void {
+    const vm = this.roomView();
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    const fe = vm?.finalEstimate;
+    const story = vm?.story;
+    const issueKey = parseJiraIssueKey(story?.jiraIssueKey ?? '');
+    if (
+      !vm?.isModerator ||
+      !uid ||
+      !sid ||
+      !story ||
+      !fe?.canSendToJira ||
+      !story.finalEstimateCard ||
+      !story.finalEstimateMethod ||
+      !issueKey ||
+      this.jiraSubmitBusy()
+    ) {
+      return;
+    }
+    this.actionError.set(null);
+    this.jiraSyncMessage.set(null);
+    this.jiraSubmitBusy.set(true);
+    this.jira
+      .sendFinalEstimate({
+        sessionId: sid,
+        storyId: story.id,
+        storyTitle: story.title,
+        estimate: story.finalEstimateCard,
+        method: story.finalEstimateMethod,
+        jiraIssueKey: issueKey,
+        jiraSiteUrl: fe.jiraSiteUrl,
+        jiraBoardId: fe.jiraBoardId,
+        includeComment: false,
+        votes: vm.results.map((r) => ({
+          memberId: r.memberId,
+          displayName: r.displayName,
+          card: r.card,
+        })),
+        participants: vm.participants.map((p) => ({
+          memberId: p.memberId,
+          displayName: p.displayName,
+        })),
+      })
+      .pipe(
+        switchMap(() => this.moderation.markActiveStoryJiraSynced(sid, uid)),
+        take(1),
+        finalize(() => this.jiraSubmitBusy.set(false)),
+      )
+      .subscribe({
+        next: () => {
+          this.jiraSyncMessage.set('Estimate sent to Jira successfully.');
+          globalThis.window?.setTimeout(() => this.jiraSyncMessage.set(null), 8000);
+        },
+        error: (err: unknown) => {
+          if (err instanceof HttpErrorResponse) {
+            this.actionError.set(
+              typeof err.error === 'string' && err.error.length > 0
+                ? err.error
+                : `Could not send to Jira (${err.status}).`,
+            );
+            return;
+          }
+          if (err instanceof Error && err.message === 'Jira integration is not configured') {
+            this.actionError.set('Jira integration is not configured.');
+            return;
+          }
+          this.setActionErrorFromUnknown(err);
+        },
+      });
   }
 
   pickVote(card: VoteCard): void {

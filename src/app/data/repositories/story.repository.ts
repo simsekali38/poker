@@ -1,5 +1,5 @@
 import { Observable } from 'rxjs';
-import { Story, StoryStatus } from '@app/core/models';
+import { FinalEstimateMethod, Story, StoryStatus, VoteCard } from '@app/core/models';
 
 export interface CreateSessionStoryParams {
   title: string;
@@ -15,6 +15,14 @@ export interface UpdateStoryPatch {
   title?: string;
   description?: string;
   status?: StoryStatus;
+  finalEstimateMethod?: FinalEstimateMethod | null;
+  finalEstimateCard?: VoteCard | null;
+  /** When true, removes final estimate + Jira sync fields (e.g. new voting round). */
+  clearFinalEstimateState?: boolean;
+  /** When true, sets `jiraSyncedAt` to server time. */
+  markJiraSynced?: boolean;
+  /** Target issue key (`PROJ-123`). `null` removes the field. */
+  jiraIssueKey?: string | null;
 }
 
 export interface StoryRepository {

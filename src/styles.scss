@@ -566,6 +566,14 @@
     transform: none;
   }
 
+  /* Locked interaction (post-reveal / saving): keep vote highlight visible; :disabled alone would gray out. */
+  .vote-deck-card--selected:disabled,
+  .vote-deck-card--revealed:disabled {
+    opacity: 1;
+    cursor: default;
+    box-shadow: var(--shadow-md);
+  }
+
   .vote-deck-card__label {
     display: block;
     text-align: center;

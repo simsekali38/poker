@@ -1,0 +1,14 @@
+{
+  "profiles": {
+    "PokerPlanning.Api": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "applicationUrl": "http://localhost:4000",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "PORT": "4000"
+      }
+    }
+  }
+}

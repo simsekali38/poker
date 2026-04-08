@@ -10,6 +10,14 @@ export interface SessionRoundTimerPatch {
   startedAt?: unknown;
 }
 
+/** Nested under `settings.*` on the session document. */
+export interface SessionJiraSettingsPatch {
+  jiraSiteUrl?: string | null;
+  jiraConnected?: boolean;
+  /** Scrum board id for Jira Agile estimation; `null` clears. */
+  jiraBoardId?: string | null;
+}
+
 export interface CreateSessionAsModeratorParams {
   sessionTitle: string;
   moderatorDisplayName: string;
@@ -17,6 +25,12 @@ export interface CreateSessionAsModeratorParams {
   deckPresetId: DeckPresetId;
   /** Trimmed, non-empty first story title (required). */
   initialStoryTitle: string;
+  /** Optional Jira Cloud base URL. */
+  jiraSiteUrl?: string | null;
+  /** Set when OAuth redirect succeeded or user confirmed site for this session. */
+  jiraConnected?: boolean;
+  /** Optional issue key for the first story (e.g. PROJ-123). */
+  initialStoryJiraIssueKey?: string | null;
 }
 
 /**
@@ -56,4 +70,7 @@ export interface SessionRepository {
 
   /** Updates nested `roundTimer` fields (moderator-only in rules). */
   patchRoundTimer(sessionId: string, patch: SessionRoundTimerPatch): Observable<void>;
+
+  /** Updates `settings.jiraSiteUrl` / `settings.jiraConnected` (moderator-only in rules). */
+  patchJiraSettings(sessionId: string, patch: SessionJiraSettingsPatch): Observable<void>;
 }

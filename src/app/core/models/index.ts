@@ -6,6 +6,7 @@ export * from './reveal-state.model';
 export * from './round-timer.model';
 export * from './session.model';
 export * from './session-member.model';
+export * from './final-estimate.model';
 export * from './story.model';
 export * from './vote.model';
 export * from './moderator-audit.model';

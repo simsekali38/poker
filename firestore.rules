@@ -1,0 +1,72 @@
+rules_version = '2';
+
+/**
+ * Example security rules for the planning poker app.
+ * Deploy: `firebase deploy --only firestore:rules` (requires `firebase.json` with `firestore.rules` path).
+ *
+ * Adjust field lists and create/update payloads to match your exact client writes.
+ * Test with the Firestore Rules Playground in Firebase Console before production.
+ */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function sessionDoc(sessionId) {
+      return get(/databases/$(database)/documents/planning_poker_sessions/$(sessionId));
+    }
+
+    function isModerator(sessionId) {
+      return signedIn()
+        && sessionDoc(sessionId).data.moderatorId == request.auth.uid;
+    }
+
+    /** True if the user has a member document in this session (joined). */
+    function isSessionMember(sessionId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/planning_poker_sessions/$(sessionId)/members/$(request.auth.uid));
+    }
+
+    match /planning_poker_sessions/{sessionId} {
+
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.moderatorId == request.auth.uid
+        && request.resource.data.status == 'active';
+
+      allow update, delete: if isModerator(sessionId);
+
+      match /members/{memberId} {
+        allow read: if signedIn();
+        // Join: write your own member doc; moderator may manage all
+        allow create: if signedIn()
+          && (memberId == request.auth.uid || isModerator(sessionId));
+        allow update: if signedIn()
+          && (memberId == request.auth.uid || isModerator(sessionId));
+        allow delete: if isModerator(sessionId);
+      }
+
+      match /stories/{storyId} {
+        allow read: if signedIn();
+        allow create, update, delete: if isModerator(sessionId);
+      }
+
+      match /votes/{voteId} {
+        allow read: if signedIn();
+        // One vote doc per user per round — only the voter may create/update their doc
+        allow create, update: if signedIn()
+          && request.resource.data.memberId == request.auth.uid
+          && isSessionMember(sessionId);
+        allow delete: if isModerator(sessionId);
+      }
+
+      match /audit/{docId} {
+        allow read: if signedIn();
+        allow write: if isModerator(sessionId);
+      }
+    }
+  }
+}

@@ -1,5 +1,6 @@
-import { Component, inject, signal, viewChild } from '@angular/core';
+import { Component, inject, OnInit, signal, viewChild } from '@angular/core';
 import { VoteCard } from '@app/core/models';
+import { ActivatedRoute, Router } from '@angular/router';
 import { SessionHeaderComponent } from '@app/shared/ui/session-header.component';
 import { copyTextToClipboard } from '@app/shared/utils/clipboard.utils';
 import { PlanningRoomActiveStoryNoticeComponent } from '../components/presentational/planning-room-active-story-notice.component';
@@ -28,9 +29,28 @@ import { PlanningSessionStore } from '../store/planning-session.store';
   styleUrl: './planning-session-page.component.scss',
   providers: [PlanningSessionStore],
 })
-export class PlanningSessionPageComponent {
+export class PlanningSessionPageComponent implements OnInit {
   readonly store = inject(PlanningSessionStore);
+  private readonly route = inject(ActivatedRoute);
+  private readonly router = inject(Router);
   private readonly storyEditor = viewChild(StoryEditDialogComponent);
+
+  ngOnInit(): void {
+    const q = this.route.snapshot.queryParamMap;
+    const connected = q.get('jira_connected');
+    let site = q.get('jira_site');
+    if (site) {
+      try {
+        site = decodeURIComponent(site);
+      } catch {
+        /* keep raw */
+      }
+    }
+    if ((connected === '1' || connected === 'true') && site?.trim()) {
+      this.store.applyJiraOAuthReturn(site.trim());
+      void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+    }
+  }
 
   /** Screen-reader feedback after copying the invite link. */
   protected readonly copyStatus = signal('');

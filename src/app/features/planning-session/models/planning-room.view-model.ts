@@ -1,4 +1,5 @@
 import { RoundTimerState, SessionStatus, Story, VoteCard } from '@app/core/models';
+import type { FinalEstimateDecisionVm } from '../view/final-estimate-vm.builder';
 
 export interface ParticipantRowVm {
   memberId: string;
@@ -68,4 +69,11 @@ export interface PlanningRoomViewModel {
 
   /** Firestore-backed round timer; remaining seconds are derived in the store with a 1s ticker. */
   roundTimer: RoundTimerState;
+
+  /** Post-reveal moderator-only: consensus / average / manual final estimate + Jira. */
+  finalEstimate: FinalEstimateDecisionVm | null;
+
+  /** From session.settings — Jira Cloud site and optional Scrum board. */
+  jiraSiteUrl: string | null;
+  jiraBoardId: string | null;
 }

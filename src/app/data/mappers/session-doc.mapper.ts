@@ -75,11 +75,19 @@ function mapSettings(raw: unknown): SessionSettings | null {
     return null;
   }
   const deckPresetId = asString(o['deckPresetId'], 'classic') as DeckPresetId;
+  const jira = o['jiraIntegrationEnabled'];
+  const site = o['jiraSiteUrl'];
+  const conn = o['jiraConnected'];
+  const board = o['jiraBoardId'];
   return {
     deckPresetId,
     cards: cards as VoteCard[],
     allowVoteChangesBeforeReveal: Boolean(o['allowVoteChangesBeforeReveal']),
     autoRevealWhenAllVoted: o['autoRevealWhenAllVoted'] === true,
+    ...(jira === true || jira === false ? { jiraIntegrationEnabled: jira } : {}),
+    ...(typeof site === 'string' ? { jiraSiteUrl: site } : {}),
+    ...(conn === true || conn === false ? { jiraConnected: conn } : {}),
+    ...(typeof board === 'string' ? { jiraBoardId: board } : {}),
   };
 }
 

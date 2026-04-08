@@ -83,6 +83,63 @@
     }
   </div>
 
+  @if (jiraUiEnabled) {
+    <fieldset class="field-group">
+      <legend>Jira (optional)</legend>
+      <p class="field-hint">
+        Link this room to Jira so final estimates can be sent to the right site and issue.
+      </p>
+      <div class="field">
+        <label for="jiraSiteUrl">Jira site URL</label>
+        <input
+          id="jiraSiteUrl"
+          type="url"
+          formControlName="jiraSiteUrl"
+          placeholder="https://your-team.atlassian.net"
+          autocomplete="off"
+          [attr.aria-invalid]="form.controls.jiraSiteUrl.invalid && form.controls.jiraSiteUrl.touched"
+        />
+        @if (form.controls.jiraSiteUrl.touched && form.controls.jiraSiteUrl.hasError('jiraSite')) {
+          <span class="field-error" role="alert">Enter a valid URL (for example https://team.atlassian.net).</span>
+        }
+      </div>
+      @if (showJiraOAuthButton()) {
+        <div class="field field--inline">
+          <button
+            type="button"
+            class="btn secondary"
+            [disabled]="jiraOAuthBusy()"
+            (click)="startJiraOAuth()"
+          >
+            @if (jiraOAuthBusy()) {
+              <span>Connecting…</span>
+            } @else {
+              <span>Connect Jira</span>
+            }
+          </button>
+          <span class="field-hint">Sign in with Atlassian; you’ll return here to finish creating the session.</span>
+        </div>
+      }
+      <div class="field">
+        <label for="initialJiraIssueKey">First story Jira issue</label>
+        <input
+          id="initialJiraIssueKey"
+          type="text"
+          formControlName="initialJiraIssueKey"
+          placeholder="PROJ-123"
+          spellcheck="false"
+          autocomplete="off"
+          [attr.aria-invalid]="
+            form.controls.initialJiraIssueKey.invalid && form.controls.initialJiraIssueKey.touched
+          "
+        />
+        @if (form.controls.initialJiraIssueKey.touched && form.controls.initialJiraIssueKey.hasError('jiraIssue')) {
+          <span class="field-error" role="alert">Use an issue key like PROJ-123.</span>
+        }
+      </div>
+    </fieldset>
+  }
+
   <div class="actions">
     <button type="submit" class="btn primary" [disabled]="isSubmitting()">
       @if (isSubmitting()) {

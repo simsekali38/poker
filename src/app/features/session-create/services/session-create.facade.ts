@@ -3,6 +3,7 @@ import { Observable, switchMap, tap } from 'rxjs';
 import { SESSION_REPOSITORY } from '@app/core/tokens/repository.tokens';
 import { AuthSessionService } from '@app/core/services/auth-session.service';
 import { SessionLocalIdentityService } from '@app/core/services/session-local-identity.service';
+import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
 import { SessionCreateFormValue } from '../models/session-create-form.model';
 
 @Injectable({ providedIn: 'root' })
@@ -17,6 +18,8 @@ export class SessionCreateFacade {
   create(value: SessionCreateFormValue): Observable<string> {
     const initialStoryTitle = value.initialStoryTitle.trim();
     const displayName = value.moderatorDisplayName.trim();
+    const siteNorm = normalizeJiraSiteUrl(value.jiraSiteUrl);
+    const jiraConnected = value.jiraOAuthCompleted || Boolean(siteNorm);
     return this.auth.ensureAnonymousSignIn().pipe(
       switchMap((moderatorUid) =>
         this.sessions
@@ -26,6 +29,9 @@ export class SessionCreateFacade {
             moderatorUid,
             deckPresetId: value.deckPresetId,
             initialStoryTitle,
+            jiraSiteUrl: siteNorm,
+            jiraConnected,
+            initialStoryJiraIssueKey: value.initialJiraIssueKey?.trim() || null,
           })
           .pipe(
             tap((sessionId) =>

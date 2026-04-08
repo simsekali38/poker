@@ -19,6 +19,7 @@
           <app-voting-card
             [label]="card | voteLabel"
             [state]="cardState(card)"
+            [interactionLocked]="disabled()"
             [focusTabIndex]="focusTabIndexFor(i)"
             [revealWave]="revealWave()"
             [staggerIndex]="i"
@@ -39,6 +40,7 @@
         <app-voting-card
           [label]="card | voteLabel"
           [state]="cardState(card)"
+          [interactionLocked]="disabled()"
           [focusTabIndex]="focusTabIndexFor(i)"
           [revealWave]="revealWave()"
           [staggerIndex]="i"

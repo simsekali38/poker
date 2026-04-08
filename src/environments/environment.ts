@@ -13,4 +13,11 @@ export const environment = {
     measurementId: "G-8LEKPYFN2L"
   } satisfies FirebaseOptions,
   useEmulators: false,
+  /** When false, “Send to Jira” stays disabled and no HTTP calls are made. */
+  jiraIntegrationEnabled: true,
+  /**
+   * Node API base (`/api` included), e.g. `http://localhost:4000/api`.
+   * OAuth + issue fetch + sync-estimate are under this path (see `docs/JIRA_ARCHITECTURE.md`).
+   */
+  jiraBackendApiUrl: 'http://localhost:4000/api',
 };

@@ -5,6 +5,7 @@ import {
   UpdateData,
   collection,
   collectionData,
+  deleteField,
   doc,
   docData,
   getDoc,
@@ -94,6 +95,10 @@ export class FirestoreStoryRepository implements StoryRepository {
       createdBy: params.createdBy,
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
+      finalEstimateMethod: null,
+      finalEstimateCard: null,
+      jiraSyncedAt: null,
+      jiraIssueKey: null,
     });
 
     if (params.makeActive) {
@@ -135,6 +140,27 @@ export class FirestoreStoryRepository implements StoryRepository {
       return;
     }
     const payload: UpdateData<DocumentData> = { updatedAt: serverTimestamp() };
+    if (patch.clearFinalEstimateState) {
+      payload['finalEstimateMethod'] = deleteField();
+      payload['finalEstimateCard'] = deleteField();
+      payload['jiraSyncedAt'] = deleteField();
+    } else {
+      if (patch.finalEstimateMethod !== undefined) {
+        payload['finalEstimateMethod'] = patch.finalEstimateMethod;
+      }
+      if (patch.finalEstimateCard !== undefined) {
+        payload['finalEstimateCard'] = patch.finalEstimateCard;
+      }
+    }
+    if (patch.markJiraSynced) {
+      payload['jiraSyncedAt'] = serverTimestamp();
+    }
+    if (patch.jiraIssueKey !== undefined) {
+      payload['jiraIssueKey'] =
+        patch.jiraIssueKey === null || patch.jiraIssueKey === ''
+          ? deleteField()
+          : patch.jiraIssueKey;
+    }
     if (patch.title !== undefined) {
       payload['title'] = patch.title.trim();
     }

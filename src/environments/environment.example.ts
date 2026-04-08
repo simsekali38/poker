@@ -16,4 +16,6 @@ export const environmentExample = {
     measurementId: "G-8LEKPYFN2L"
   } satisfies FirebaseOptions,
   useEmulators: false,
+  jiraIntegrationEnabled: true,
+  jiraBackendApiUrl: '',
 };

@@ -5,6 +5,12 @@
       [canEdit]="vm().canEditActiveStory"
       (editRequest)="editStory.emit()"
     />
+    @if (jiraIssuePreviewEnabled) {
+      <app-jira-linked-issue-panel
+        [issueKey]="vm().story?.jiraIssueKey ?? null"
+        [siteUrl]="vm().jiraSiteUrl"
+      />
+    }
   </div>
 
   <div class="planning-main__timer">
@@ -86,5 +92,8 @@
       [votesRevealed]="vm().votesRevealed"
       [hasActiveStory]="!!vm().activeStoryId"
     />
+    @if (vm().finalEstimate; as fe) {
+      <app-final-estimate-decision [decision]="fe" [roundEpoch]="vm().roundEpoch" />
+    }
   </div>
 </section>

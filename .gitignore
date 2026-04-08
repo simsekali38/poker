@@ -40,3 +40,5 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+/server-dotnet/PokerPlanning.Api/appsettings.json
+/server-dotnet/PokerPlanning.Api/appsettings.Development.json

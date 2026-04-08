@@ -1,0 +1,241 @@
+<app-ui-panel title="Final estimate decision" [hover]="false" [labelledBy]="'final-estimate-h'">
+  @if (store.jiraSyncMessage(); as msg) {
+    <p class="fed-flash" role="status">
+      {{ msg }}
+      <button type="button" class="fed-flash__dismiss" (click)="store.clearJiraSyncMessage()">Dismiss</button>
+    </p>
+  }
+
+  <div class="fed-current" aria-live="polite">
+    @if (decision().story.finalEstimateCard; as card) {
+      <p class="fed-current__label">Selected final estimate</p>
+      <p class="fed-current__value">
+        <span class="fed-current__card">{{ card | voteLabel }}</span>
+        @if (decision().story.finalEstimateMethod; as m) {
+          <span class="fed-current__via">via {{ methodLabel(m) }}</span>
+        }
+      </p>
+    } @else {
+      <p class="fed-current__empty">No final estimate selected yet.</p>
+    }
+  </div>
+
+  @if (decision().story.jiraSyncedAt; as syncedAt) {
+    <p class="fed-synced" role="status">
+      Synced to Jira
+      <time class="fed-synced__time" [attr.datetime]="syncedAt.toISOString()">{{ syncedAt | date: 'medium' }}</time>
+    </p>
+  }
+
+  <div class="fed-options" role="group" aria-label="How to choose the final estimate">
+    <!-- Consensus -->
+    <div
+      class="fed-option"
+      [class.fed-option--selected]="methodSelected('consensus')"
+      [class.fed-option--disabled]="!decision().consensus.available"
+    >
+      <div class="fed-option__head">
+        <h3 class="fed-option__title">Use consensus</h3>
+        @if (decision().consensus.available && decision().consensus.card; as c) {
+          <span class="ui-badge ui-badge--primary">{{ c | voteLabel }}</span>
+        }
+      </div>
+      @if (decision().consensus.available && decision().consensus.card; as c) {
+        <p class="fed-option__desc">All numeric votes match — you can lock this value.</p>
+        <button
+          type="button"
+          uiBtn="secondary"
+          uiBtnSize="sm"
+          [disabled]="store.finalEstimateBusy()"
+          (click)="onConsensus()"
+        >
+          Select consensus
+        </button>
+      } @else {
+        <p class="fed-option__warn">{{ decision().consensus.unavailableReason }}</p>
+      }
+    </div>
+
+    <!-- Rounded average -->
+    <div
+      class="fed-option"
+      [class.fed-option--selected]="methodSelected('rounded_average')"
+      [class.fed-option--disabled]="!decision().average.available"
+    >
+      <div class="fed-option__head">
+        <h3 class="fed-option__title">Use rounded-up average</h3>
+      </div>
+      @if (decision().average.available) {
+        <p class="fed-option__metrics">
+          <span>Raw average: <strong>{{ decision().average.rawAverage! | number: '1.0-4' }}</strong></span>
+          <span
+            >Rounded up to:
+            <strong>{{ decision().average.roundedCard! | voteLabel }}</strong></span
+          >
+        </p>
+        <button
+          type="button"
+          uiBtn="secondary"
+          uiBtnSize="sm"
+          [disabled]="store.finalEstimateBusy()"
+          (click)="onAverage()"
+        >
+          Select rounded-up card
+        </button>
+      } @else {
+        <p class="fed-option__warn">{{ decision().average.unavailableReason }}</p>
+      }
+    </div>
+
+    <!-- Moderator pick -->
+    <div
+      class="fed-option fed-option--wide"
+      [class.fed-option--selected]="methodSelected('moderator_pick')"
+    >
+      <h3 class="fed-option__title">Use moderator selection</h3>
+      <p class="fed-option__desc">Pick any numeric card from the deck for this story.</p>
+      <div class="fed-pick-grid" role="group" aria-label="Numeric deck cards">
+        @for (c of decision().moderatorPickOptions; track c) {
+          <button
+            type="button"
+            class="fed-pick-btn"
+            [class.fed-pick-btn--active]="
+              decision().story.finalEstimateMethod === 'moderator_pick' &&
+              decision().story.finalEstimateCard === c
+            "
+            [disabled]="store.finalEstimateBusy()"
+            (click)="onModeratorCard(c)"
+          >
+            {{ c | voteLabel }}
+          </button>
+        }
+      </div>
+      @if (decision().moderatorPickOptions.length === 0) {
+        <p class="fed-option__warn">No numeric cards in this deck.</p>
+      }
+    </div>
+  </div>
+
+  @if (decision().jiraIntegrationAvailable && !decision().story.jiraSyncedAt) {
+    <div class="fed-jira-setup">
+      <h3 class="fed-jira-setup__title">Jira</h3>
+      @if (!decision().jiraSessionReady) {
+        <p class="fed-jira-setup__desc">Add your Jira Cloud site.</p>
+        <div class="fed-jira-setup__row">
+          <input
+            #jiraSite
+            type="url"
+            class="fed-jira-setup__input"
+            placeholder="https://your-team.atlassian.net"
+            autocomplete="off"
+          />
+          <button
+            type="button"
+            uiBtn="secondary"
+            uiBtnSize="sm"
+            [disabled]="store.jiraMetaBusy()"
+            (click)="store.saveSessionJiraSite(jiraSite.value)"
+          >
+            Save site
+          </button>
+        </div>
+        @if (showConnectJira()) {
+          <p class="fed-jira-setup__oauth">
+            <button
+              type="button"
+              class="fed-jira-setup__oauth-btn"
+              [disabled]="jiraOAuthBusy()"
+              (click)="startConnectJira()"
+            >
+              @if (jiraOAuthBusy()) {
+                Connecting…
+              } @else {
+                Connect Jira
+              }
+            </button>
+            <span class="fed-jira-setup__oauth-hint"> (Atlassian sign-in)</span>
+          </p>
+        }
+      } @else {
+        <p class="fed-jira-setup__site">
+          Jira site:
+          <strong>{{ decision().jiraSiteUrl ?? 'Connected' }}</strong>
+        </p>
+      }
+      <div class="fed-jira-setup__issue">
+        <label class="fed-jira-setup__label" for="fed-jira-issue">Issue key</label>
+        <div class="fed-jira-setup__row">
+          <input
+            id="fed-jira-issue"
+            #jiraIssue
+            type="text"
+            class="fed-jira-setup__input"
+            placeholder="PROJ-123"
+            spellcheck="false"
+            autocomplete="off"
+          />
+          <button
+            type="button"
+            uiBtn="secondary"
+            uiBtnSize="sm"
+            [disabled]="store.jiraMetaBusy()"
+            (click)="store.saveActiveStoryJiraIssueKey(jiraIssue.value)"
+          >
+            Save issue
+          </button>
+        </div>
+        @if (decision().story.jiraIssueKey; as ik) {
+          <p class="fed-jira-setup__saved">Linked issue: <strong>{{ ik }}</strong></p>
+        }
+      </div>
+      @if (decision().jiraSessionReady) {
+        <div class="fed-jira-setup__board">
+          <label class="fed-jira-setup__label" for="fed-jira-board">Scrum board id (optional)</label>
+          <p class="fed-jira-setup__hint">
+            From a Jira board URL: <code>…/jira/software/projects/X/boards/<strong>123</strong></code> — used for Agile
+            estimation when set.
+          </p>
+          <div class="fed-jira-setup__row">
+            <input
+              id="fed-jira-board"
+              #jiraBoard
+              type="text"
+              class="fed-jira-setup__input"
+              inputmode="numeric"
+              pattern="[0-9]*"
+              placeholder="e.g. 123"
+              autocomplete="off"
+            />
+            <button
+              type="button"
+              uiBtn="secondary"
+              uiBtnSize="sm"
+              [disabled]="store.jiraMetaBusy()"
+              (click)="store.saveSessionJiraBoardId(jiraBoard.value)"
+            >
+              Save board
+            </button>
+          </div>
+          @if (decision().jiraBoardId; as bid) {
+            <p class="fed-jira-setup__saved">Saved board id: <strong>{{ bid }}</strong></p>
+          }
+        </div>
+      }
+    </div>
+  }
+
+  <div class="fed-jira">
+    <button
+      type="button"
+      uiBtn="primary"
+      [disabled]="!decision().canSendToJira || store.jiraSubmitBusy()"
+      [uiBtnLoading]="store.jiraSubmitBusy()"
+      (click)="onSendJira()"
+    >
+      Send to Jira
+    </button>
+    @if (decision().jiraActionHint) {
+      <p class="fed-jira__hint">{{ decision().jiraActionHint }}</p>
+    }
+  </div>
+</app-ui-panel>

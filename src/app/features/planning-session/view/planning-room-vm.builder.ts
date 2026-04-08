@@ -8,6 +8,7 @@ import {
   ResultRowVm,
   StoryHistoryRowVm,
 } from '../models/planning-room.view-model';
+import { buildFinalEstimateDecisionVm } from './final-estimate-vm.builder';
 
 export interface SessionRoomPayload {
   session: Session | null;
@@ -87,6 +88,16 @@ export function buildPlanningRoomViewModel(
     votesRevealed: revealed,
   });
 
+  const finalEstimate = buildFinalEstimateDecisionVm({
+    session,
+    story,
+    votes,
+    votesRevealed: revealed,
+    isModerator,
+    deck: session.settings.cards,
+    numericAverage,
+  });
+
   const storyHistoryRows: StoryHistoryRowVm[] = allStories.map((s) => {
     const isActive = session.activeStoryId === s.id;
     const slice = isActive ? votes : (inactiveStoryLatestVotes.get(s.id) ?? []);
@@ -102,6 +113,9 @@ export function buildPlanningRoomViewModel(
       historyNumericAverage,
     };
   });
+
+  const jiraSiteUrl = session.settings.jiraSiteUrl?.trim() || null;
+  const jiraBoardId = session.settings.jiraBoardId?.trim() || null;
 
   return {
     sessionId: session.id,
@@ -130,5 +144,8 @@ export function buildPlanningRoomViewModel(
     canResetRound,
     everyoneActiveVoted,
     roundTimer: session.roundTimer,
+    finalEstimate,
+    jiraSiteUrl,
+    jiraBoardId,
   };
 }

@@ -1,4 +1,5 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
+import { provideHttpClient, withFetch } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { provideFirebaseAppAndFirestore } from '@app/data/firebase/firebase-app.providers';
 import {
@@ -17,6 +18,7 @@ import { routes } from './app.routes';
 export const appConfig: ApplicationConfig = {
   providers: [
     provideZoneChangeDetection({ eventCoalescing: true }),
+    provideHttpClient(withFetch()),
     provideRouter(routes),
     ...provideFirebaseAppAndFirestore(),
     { provide: SESSION_REPOSITORY, useExisting: FirestoreSessionRepository },

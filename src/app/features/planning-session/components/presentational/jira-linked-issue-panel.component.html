@@ -1,0 +1,41 @@
+@if (issueKey() && siteUrl()) {
+  <section class="jira-issue" aria-label="Linked Jira issue">
+    <h3 class="jira-issue__title">Jira issue</h3>
+    @if (loading()) {
+      <p class="jira-issue__muted">Loading issue from Jira…</p>
+    } @else if (error()) {
+      <p class="jira-issue__warn" role="alert">{{ error() }}</p>
+    } @else {
+      @if (issue(); as j) {
+        <p class="jira-issue__key">
+          <strong>{{ j.issueKey }}</strong>
+          <span class="jira-issue__id">(id {{ j.issueId }})</span>
+        </p>
+        <p class="jira-issue__summary">{{ j.summary }}</p>
+        <dl class="jira-issue__meta">
+          <div>
+            <dt>Status</dt>
+            <dd>{{ j.status.name }}</dd>
+          </div>
+          @if (j.assignee; as a) {
+            <div>
+              <dt>Assignee</dt>
+              <dd>{{ a.displayName }}</dd>
+            </div>
+          } @else {
+            <div>
+              <dt>Assignee</dt>
+              <dd class="jira-issue__muted">Unassigned</dd>
+            </div>
+          }
+        </dl>
+        @if (j.description) {
+          <details class="jira-issue__details">
+            <summary>Description</summary>
+            <pre class="jira-issue__desc">{{ j.description }}</pre>
+          </details>
+        }
+      }
+    }
+  </section>
+}
