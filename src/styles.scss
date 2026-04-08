@@ -480,15 +480,15 @@
 
   /* --- Vote deck (picker cards; keep keyboard focus on button) --- */
   .vote-deck-card {
-    width: 100%;
+    // width: 100%;
     min-width: 4.5rem;
     min-height: 4.5rem;
-    aspect-ratio: 1;
+    // aspect-ratio: 1;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     box-sizing: border-box;
-    margin: 0;
+    margin: 2px;
     padding: var(--space-2);
     border-radius: var(--radius-xl);
     border: 1px solid color-mix(in srgb, var(--color-text) 8%, var(--color-border));
