@@ -57,8 +57,26 @@ public sealed class JiraController : ControllerBase
     }
 
     [HttpGet("oauth/callback")]
-    public async Task<IActionResult> OAuthCallback([FromQuery] string? code, [FromQuery] string? state, CancellationToken ct)
+    public async Task<IActionResult> OAuthCallback(
+        [FromQuery(Name = "error")] string? oauthError,
+        [FromQuery] string? code,
+        [FromQuery] string? state,
+        CancellationToken ct)
     {
+        if (!string.IsNullOrEmpty(oauthError) && !string.IsNullOrEmpty(state))
+        {
+            var stDenied = _oauthState.Consume(state);
+            if (stDenied != null)
+            {
+                return RedirectWithJiraError(stDenied.ReturnUrl, oauthError);
+            }
+        }
+
+        if (!string.IsNullOrEmpty(oauthError) && string.IsNullOrEmpty(state))
+        {
+            return TextPlain(oauthError, StatusCodes.Status400BadRequest);
+        }
+
         if (string.IsNullOrEmpty(code) || string.IsNullOrEmpty(state))
         {
             return TextPlain("Missing code or state", StatusCodes.Status400BadRequest);
@@ -117,8 +135,22 @@ public sealed class JiraController : ControllerBase
         catch (Exception ex)
         {
             Console.Error.WriteLine(ex);
-            return TextPlain("OAuth callback failed", StatusCodes.Status500InternalServerError);
+            var msg = ex.Message;
+            if (msg.Length > 400)
+            {
+                msg = msg[..400];
+            }
+
+            return RedirectWithJiraError(st.ReturnUrl, msg);
         }
+    }
+
+    private static RedirectResult RedirectWithJiraError(string returnUrl, string errorCode)
+    {
+        var url = QueryHelpers.AddQueryString(
+            returnUrl,
+            new Dictionary<string, string?> { ["jira_error"] = errorCode });
+        return new RedirectResult(url);
     }
 
     private static ContentResult TextPlain(string body, int statusCode) =>

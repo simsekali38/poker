@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import { z } from 'zod';
 import { env } from '../config/env.js';
 import { consumeOAuthState, createOAuthState } from '../lib/oauthStateStore.js';
@@ -36,12 +36,33 @@ router.post('/oauth/start', requireFirebaseAuth, (req, res) => {
   res.json({ redirectUrl: authorizeUrl });
 });
 
+function redirectWithJiraError(returnUrl: string, errorCode: string, res: Response): void {
+  const u = new URL(returnUrl);
+  u.searchParams.set('jira_error', errorCode.slice(0, 400));
+  res.redirect(u.toString());
+}
+
 /**
  * GET /jira/oauth/callback — browser redirect from Atlassian
  */
 router.get('/oauth/callback', async (req, res) => {
+  const oauthError = typeof req.query.error === 'string' ? req.query.error : '';
   const code = typeof req.query.code === 'string' ? req.query.code : '';
   const state = typeof req.query.state === 'string' ? req.query.state : '';
+
+  if (oauthError && state) {
+    const stDenied = consumeOAuthState(state);
+    if (stDenied) {
+      redirectWithJiraError(stDenied.returnUrl, oauthError, res);
+      return;
+    }
+  }
+
+  if (oauthError && !state) {
+    res.status(400).send(oauthError);
+    return;
+  }
+
   if (!code || !state) {
     res.status(400).send('Missing code or state');
     return;
@@ -82,7 +103,8 @@ router.get('/oauth/callback', async (req, res) => {
     res.redirect(url.toString());
   } catch (e) {
     console.error(e);
-    res.status(500).send('OAuth callback failed');
+    const msg = e instanceof Error ? e.message : 'OAuth callback failed';
+    redirectWithJiraError(st.returnUrl, msg, res);
   }
 });
 

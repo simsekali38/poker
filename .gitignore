@@ -42,3 +42,6 @@ testem.log
 Thumbs.db
 /server-dotnet/PokerPlanning.Api/appsettings.json
 /server-dotnet/PokerPlanning.Api/appsettings.Development.json
+/server-dotnet/PokerPlanning.Api/PokerPlanning.Api.sln
+/server/.env
+/server/.env.example

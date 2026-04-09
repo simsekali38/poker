@@ -1,6 +1,18 @@
 <h1>Create session</h1>
 <p class="lede">Set up a room, then share the session link with your team.</p>
 
+@if (jiraOAuthFeedback(); as jf) {
+  <div
+    class="banner"
+    [class.banner--success]="jf.kind === 'success'"
+    [class.banner--error]="jf.kind === 'error'"
+    role="status"
+    aria-live="polite"
+  >
+    {{ jf.text }}
+  </div>
+}
+
 @if (submitError(); as err) {
   <div class="banner banner--error" role="alert" aria-live="polite">{{ err }}</div>
 }

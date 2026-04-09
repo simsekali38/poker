@@ -1,4 +1,5 @@
 import { Component, inject, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   AbstractControl,
   NonNullableFormBuilder,
@@ -7,7 +8,18 @@ import {
   Validators,
 } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { finalize, take } from 'rxjs';
+import {
+  catchError,
+  debounceTime,
+  distinctUntilChanged,
+  filter,
+  finalize,
+  map,
+  merge,
+  of,
+  switchMap,
+  take,
+} from 'rxjs';
 import { DeckPresetId } from '@app/core/models';
 import { AutofocusDirective } from '@app/shared/directives/autofocus.directive';
 import { DECK_PRESET_OPTIONS, isKnownDeckPresetId } from '@app/shared/utils/deck-presets';
@@ -61,6 +73,8 @@ export class SessionCreatePageComponent implements OnInit {
   protected readonly isSubmitting = signal(false);
   protected readonly jiraOAuthBusy = signal(false);
   protected readonly submitError = signal<string | null>(null);
+  /** Shown after OAuth redirect (query cleared). */
+  protected readonly jiraOAuthFeedback = signal<{ kind: 'success' | 'error'; text: string } | null>(null);
 
   protected readonly form = this.fb.group({
     sessionTitle: this.fb.control('', {
@@ -72,16 +86,78 @@ export class SessionCreatePageComponent implements OnInit {
     initialStoryTitle: this.fb.control('', {
       validators: [Validators.required, Validators.minLength(2), Validators.maxLength(200)],
     }),
-    deckPresetId: this.fb.control<DeckPresetId>('classic', {
+    deckPresetId: this.fb.control<DeckPresetId>('fibonacci', {
       validators: [Validators.required, this.deckPresetValidator],
     }),
-    jiraSiteUrl: this.fb.control('https://migrosone.atlassian.net/', { validators: [this.optionalJiraSiteValidator] }),
+    jiraSiteUrl: this.fb.control('', { validators: [this.optionalJiraSiteValidator] }),
     initialJiraIssueKey: this.fb.control('', { validators: [this.optionalJiraIssueValidator] }),
     jiraOAuthCompleted: this.fb.control(false),
   });
 
+  constructor() {
+    merge(this.form.controls.initialJiraIssueKey.valueChanges, this.form.controls.jiraSiteUrl.valueChanges)
+      .pipe(
+        debounceTime(500),
+        map(() => ({
+          site: normalizeJiraSiteUrl(this.form.controls.jiraSiteUrl.value?.trim() ?? ''),
+          key: parseJiraIssueKey(this.form.controls.initialJiraIssueKey.value),
+        })),
+        distinctUntilChanged(
+          (a, b) =>
+            a.site === b.site && a.key === b.key,
+        ),
+        filter(
+          () =>
+            this.jiraUiEnabled &&
+            Boolean(environment.jiraBackendApiUrl?.trim()),
+        ),
+        filter(
+          (x): x is { site: string; key: string } =>
+            x.site !== null && x.key !== null,
+        ),
+        switchMap((x) =>
+          this.jiraBackend.getIssue(x.key, x.site).pipe(catchError(() => of(null))),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((issue) => {
+        if (!issue) {
+          return;
+        }
+        const summary = (issue.summary ?? '').trim();
+        const storyTitle =
+          summary.length >= 2
+            ? summary.slice(0, 200)
+            : summary.length === 1
+              ? `${issue.issueKey}: ${summary}`.slice(0, 200)
+              : issue.issueKey;
+        const sessionRaw = summary ? `${issue.issueKey}: ${summary}` : issue.issueKey;
+        const sessionTitle = sessionRaw.slice(0, 120);
+        this.form.patchValue(
+          { initialStoryTitle: storyTitle, sessionTitle: sessionTitle },
+          { emitEvent: false },
+        );
+      });
+  }
+
   ngOnInit(): void {
     const q = this.route.snapshot.queryParamMap;
+    const jiraError = q.get('jira_error');
+    if (jiraError) {
+      let text = jiraError;
+      try {
+        text = decodeURIComponent(jiraError);
+      } catch {
+        /* keep raw */
+      }
+      this.jiraOAuthFeedback.set({
+        kind: 'error',
+        text: this.formatJiraOAuthCallbackError(text),
+      });
+      void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
+      return;
+    }
+
     const connected = q.get('jira_connected');
     let site = q.get('jira_site');
     if (site) {
@@ -91,10 +167,31 @@ export class SessionCreatePageComponent implements OnInit {
         /* keep raw */
       }
     }
-    if ((connected === '1' || connected === 'true') && site?.trim()) {
-      this.form.patchValue({ jiraSiteUrl: site.trim(), jiraOAuthCompleted: true });
+    if (connected === '1' || connected === 'true') {
+      const patch: { jiraSiteUrl?: string; jiraOAuthCompleted: boolean } = {
+        jiraOAuthCompleted: true,
+      };
+      if (site?.trim()) {
+        patch.jiraSiteUrl = site.trim();
+      }
+      this.form.patchValue(patch);
+      this.jiraOAuthFeedback.set({
+        kind: 'success',
+        text: 'Jira connected. You can finish creating the session.',
+      });
       void this.router.navigate([], { relativeTo: this.route, queryParams: {}, replaceUrl: true });
     }
+  }
+
+  private formatJiraOAuthCallbackError(raw: string): string {
+    const lower = raw.trim().toLowerCase();
+    if (lower === 'access_denied') {
+      return 'Jira authorization was cancelled.';
+    }
+    if (lower.includes('invalid_grant') || lower.includes('code')) {
+      return 'Jira login failed or the link expired. Try Connect Jira again.';
+    }
+    return raw.length > 220 ? `${raw.slice(0, 220)}…` : raw;
   }
 
   /** POST /jira/oauth/start then full-page redirect to Atlassian. */
@@ -106,7 +203,13 @@ export class SessionCreatePageComponent implements OnInit {
     this.jiraOAuthBusy.set(true);
     this.jiraBackend.startOAuth(returnUrl).subscribe({
       next: (r) => globalThis.location.assign(r.redirectUrl),
-      error: () => this.jiraOAuthBusy.set(false),
+      error: () => {
+        this.jiraOAuthBusy.set(false);
+        this.jiraOAuthFeedback.set({
+          kind: 'error',
+          text: 'Could not start Jira login. Check that the API is reachable and you are signed in.',
+        });
+      },
     });
   }
 
