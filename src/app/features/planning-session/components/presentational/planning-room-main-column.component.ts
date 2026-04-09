@@ -3,6 +3,7 @@ import { environment } from '@env/environment';
 import { UiPanelComponent } from '@app/shared/ui/design-system';
 import { RevealControlsComponent } from '@app/shared/ui/reveal-controls.component';
 import { StoryPanelComponent } from '@app/shared/ui/story-panel.component';
+import { VoteLabelPipe } from '@app/shared/pipes/vote-label.pipe';
 import { VotingCardGridComponent } from '@app/shared/ui/voting-card-grid.component';
 import { PlanningRoomViewModel } from '../../models/planning-room.view-model';
 import { PlanningSessionStore } from '../../store/planning-session.store';
@@ -22,6 +23,7 @@ import { RoomVotingStatusComponent } from './room-voting-status.component';
     RoomVotingStatusComponent,
     RoomCircularTimerComponent,
     RoomEveryoneVotedBannerComponent,
+    VoteLabelPipe,
     VotingCardGridComponent,
     RevealControlsComponent,
     RoomResultsPanelComponent,

@@ -1,4 +1,4 @@
-import { Injectable, computed, inject, signal } from '@angular/core';
+import { Injectable, computed, effect, inject, signal, untracked } from '@angular/core';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { Auth, authState } from '@angular/fire/auth';
 import { ActivatedRoute } from '@angular/router';
@@ -48,6 +48,12 @@ type RoomStreamState =
 
 export type PlanningRoomPhase = 'loading' | 'missing' | 'ready';
 
+type PendingLocalVote = {
+  card: VoteCard;
+  storyId: string;
+  roundEpoch: number;
+};
+
 @Injectable()
 export class PlanningSessionStore {
   private readonly route = inject(ActivatedRoute);
@@ -72,6 +78,12 @@ export class PlanningSessionStore {
   readonly jiraMetaBusy = signal(false);
   /** Transient success line after Jira sync. */
   readonly jiraSyncMessage = signal<string | null>(null);
+
+  /**
+   * Firestore vote snapshot can lag behind submit; merge so the deck keeps `selected` styling
+   * while `voteSubmitBusy` locks interaction.
+   */
+  private readonly pendingLocalVote = signal<PendingLocalVote | null>(null);
 
   /** Ticks once per second so `roundTimerRemainingSec` stays current while the room is open. */
   private readonly timerClock = toSignal(interval(1000).pipe(startWith(0)), { initialValue: 0 });
@@ -203,7 +215,37 @@ export class PlanningSessionStore {
   );
 
   readonly roomPhase = computed<PlanningRoomPhase>(() => this.planningRoom().phase);
-  readonly roomView = computed(() => this.planningRoom().view);
+
+  readonly roomView = computed((): PlanningRoomViewModel | null => {
+    const base = this.planningRoom().view;
+    if (!base) {
+      return null;
+    }
+    const pending = this.pendingLocalVote();
+    const pendingActive =
+      pending !== null &&
+      pending.storyId === base.activeStoryId &&
+      pending.roundEpoch === base.roundEpoch;
+    const localVote = pendingActive ? pending.card : base.localVote;
+    return localVote === base.localVote ? base : { ...base, localVote };
+  });
+
+  constructor() {
+    effect(() => {
+      const base = this.planningRoom().view;
+      const pending = this.pendingLocalVote();
+      if (!base || !pending) {
+        return;
+      }
+      if (base.activeStoryId !== pending.storyId || base.roundEpoch !== pending.roundEpoch) {
+        untracked(() => this.pendingLocalVote.set(null));
+        return;
+      }
+      if (base.localVote === pending.card) {
+        untracked(() => this.pendingLocalVote.set(null));
+      }
+    });
+  }
 
   dismissActionError(): void {
     this.actionError.set(null);
@@ -435,6 +477,11 @@ export class PlanningSessionStore {
     if (!vm?.canVote || !uid || !sid || !vm.activeStoryId || this.voteSubmitBusy()) {
       return;
     }
+    this.pendingLocalVote.set({
+      card,
+      storyId: vm.activeStoryId,
+      roundEpoch: vm.roundEpoch,
+    });
     this.voteSubmitBusy.set(true);
     this.votes
       .submitVote({
@@ -449,8 +496,10 @@ export class PlanningSessionStore {
         finalize(() => this.voteSubmitBusy.set(false)),
       )
       .subscribe({
-        error: () =>
-          this.actionError.set('Could not save your vote. Check your connection and permissions.'),
+        error: () => {
+          this.pendingLocalVote.set(null);
+          this.actionError.set('Could not save your vote. Check your connection and permissions.');
+        },
       });
   }
 

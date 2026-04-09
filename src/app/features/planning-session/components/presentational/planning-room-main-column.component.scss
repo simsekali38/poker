@@ -10,10 +10,10 @@
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
     grid-template-areas:
-      'story timer'
-      'progress timer'
-      'vote mod'
-      'results results';
+      "story timer"
+      "progress timer"
+      "vote mod"
+      "results results";
     align-items: start;
     column-gap: var(--space-5);
     row-gap: var(--space-4);
@@ -48,4 +48,10 @@
 
 .planning-main__moderate .ui-section-helper {
   margin-top: 0;
+}
+.vote-deck-card--selected {
+  border-color: transparent;
+  background: var(--color-primary);
+  color: #fff;
+  box-shadow: var(--shadow-md);
 }

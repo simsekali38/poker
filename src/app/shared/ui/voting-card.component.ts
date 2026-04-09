@@ -83,10 +83,6 @@ export class VotingCardComponent {
     );
   }
 
-  protected buttonClasses(): string {
-    return `vote-deck-card vote-deck-card--${this.state()}`;
-  }
-
   focusCard(): void {
     const btn = this.el.nativeElement.querySelector('button');
     if (btn instanceof HTMLButtonElement) {

@@ -44,6 +44,15 @@
         [votesRevealed]="vm().votesRevealed"
         [hasActiveStory]="!!vm().activeStoryId"
       />
+      @if (vm().localVote; as pick) {
+        <p class="ui-section-helper m-0 mb-3" aria-live="polite">
+          Your vote:
+          <span class="font-semibold text-[var(--color-text)]">{{ pick | voteLabel }}</span>
+          @if (voteSubmitBusy()) {
+            <span class="text-[var(--color-text-secondary)]"> · Saving…</span>
+          }
+        </p>
+      }
       <app-voting-card-grid
         [cards]="vm().deck"
         [selectedCard]="vm().localVote"

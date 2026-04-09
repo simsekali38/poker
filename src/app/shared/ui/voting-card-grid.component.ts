@@ -10,7 +10,11 @@ import {
 import { VoteLabelPipe } from '@app/shared/pipes/vote-label.pipe';
 import { VotingCardComponent } from './voting-card.component';
 import { VotingCardState } from './voting-card.types';
-import { VotingDeckPresentation, resolveVotingCardState } from './voting-deck.utils';
+import {
+  VotingDeckPresentation,
+  resolveVotingCardState,
+  voteCardKeysEqual,
+} from './voting-deck.utils';
 
 @Component({
   selector: 'app-voting-card-grid',
@@ -69,7 +73,7 @@ export class VotingCardGridComponent {
     });
   }
 
-  protected cardState(value: string): VotingCardState {
+  protected cardState(value: unknown): VotingCardState {
     return resolveVotingCardState({
       cardValue: value,
       selectedValue: this.selectedCard(),
@@ -78,8 +82,9 @@ export class VotingCardGridComponent {
     });
   }
 
-  protected isSelected(card: string): boolean {
-    return this.selectedCard() === card;
+  protected isSelected(card: unknown): boolean {
+    const sel = this.selectedCard();
+    return sel != null && voteCardKeysEqual(sel, card);
   }
 
   protected focusTabIndexFor(i: number): number {

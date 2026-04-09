@@ -16,7 +16,7 @@ import { Component, input } from '@angular/core';
           >✓</span>
         <div class="min-w-0 leading-snug">
           <span class="block text-success">Everyone has voted</span>
-          <span class="block text-xs font-medium text-muted" dir="rtl">כולם הצביעו</span>
+          <span class="block text-xs font-medium text-muted"></span>
         </div>
       </div>
     }

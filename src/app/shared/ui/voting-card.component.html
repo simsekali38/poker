@@ -1,6 +1,10 @@
 <button
   type="button"
-  [class]="buttonClasses()"
+  class="vote-deck-card"
+  [class.vote-deck-card--default]="state() === 'default'"
+  [class.vote-deck-card--selected]="state() === 'selected'"
+  [class.vote-deck-card--revealed]="state() === 'revealed'"
+  [class.vote-deck-card--disabled]="state() === 'disabled'"
   [class.vote-deck-card--pulse]="votePulse() && state() === 'selected'"
   [attr.tabindex]="effectiveTabIndex()"
   [attr.aria-disabled]="isDisabled() ? true : null"
