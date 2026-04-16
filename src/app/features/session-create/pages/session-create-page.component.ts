@@ -219,6 +219,7 @@ export class SessionCreatePageComponent implements OnInit {
   }
 
   protected submit(): void {
+    const formattedDate = new Date().toLocaleDateString('tr-TR');
     this.submitError.set(null);
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -231,7 +232,7 @@ export class SessionCreatePageComponent implements OnInit {
     const raw = this.form.getRawValue();
     this.sessionCreate
       .create({
-        sessionTitle: raw.sessionTitle,
+        sessionTitle: raw.sessionTitle + ' - ' + formattedDate,
         moderatorDisplayName: raw.moderatorDisplayName,
         initialStoryTitle: raw.initialStoryTitle,
         deckPresetId: raw.deckPresetId,

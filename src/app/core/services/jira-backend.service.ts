@@ -12,6 +12,8 @@ export interface JiraIssuePreviewDto {
   description: string | null;
   status: { id: string; name: string; category?: string };
   assignee: { accountId: string; displayName: string; emailAddress: string | null } | null;
+  /** Set when `includeCurrentSprint` was requested: Agile sprint id (active, else future). */
+  currentSprintId?: number | null;
 }
 
 @Injectable({ providedIn: 'root' })
@@ -51,11 +53,18 @@ export class JiraBackendService {
   }
 
   /** GET /jira/issues/:issueKey */
-  getIssue(issueKey: string, siteUrl: string): Observable<JiraIssuePreviewDto> {
+  getIssue(
+    issueKey: string,
+    siteUrl: string,
+    options?: { readonly includeCurrentSprint?: boolean },
+  ): Observable<JiraIssuePreviewDto> {
     if (!this.base) {
       return throwError(() => new Error('Jira backend URL is not configured'));
     }
-    const params = new HttpParams().set('siteUrl', siteUrl);
+    let params = new HttpParams().set('siteUrl', siteUrl);
+    if (options?.includeCurrentSprint) {
+      params = params.set('includeCurrentSprint', 'true');
+    }
     return this.authorizedHeaders().pipe(
       switchMap((headers) =>
         this.http.get<JiraIssuePreviewDto>(`${this.base}/jira/issues/${encodeURIComponent(issueKey)}`, {

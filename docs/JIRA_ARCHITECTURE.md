@@ -54,7 +54,7 @@ flowchart LR
 
 1. User signs in with Firebase (including anonymous).
 2. User clicks **Connect Jira**. SPA obtains a Firebase **ID token** and calls `POST /api/jira/oauth/start` with `{ returnUrl }`.
-3. API verifies the ID token, creates a short-lived **state** record (in-memory; use Redis in multi-instance production), and returns `{ redirectUrl }` pointing to `https://auth.atlassian.com/authorize` with `audience=api.atlassian.com`, `client_id`, `redirect_uri`, `response_type=code`, `prompt=consent`, `scope` (from `Atlassian:Scopes`; must include Jira Software granular scopes for Agile — e.g. `read:board-scope:jira-software` and `read:project:jira` for board list — see `server-dotnet/README.md`), and `state`.
+3. API verifies the ID token, creates a short-lived **state** record (in-memory; use Redis in multi-instance production), and returns `{ redirectUrl }` pointing to `https://auth.atlassian.com/authorize` with `audience=api.atlassian.com`, `client_id`, `redirect_uri`, `response_type=code`, `prompt=consent`, `scope` (from `Atlassian:Scopes` / `Atlassian__Scopes`; **must match** the OAuth app’s enabled permission codes — verified reference string in `server-dotnet/README.md` § *Referans — doğrulanmış `Atlassian__Scopes`*), and `state`.
 4. Browser navigates to `redirectUrl`. User approves at Atlassian.
 5. Atlassian redirects to `GET /api/jira/oauth/callback?code=...&state=...`.
 6. API validates `state`, exchanges `code` for access/refresh tokens, stores encrypted tokens keyed by **Firebase UID**, resolves a default `jira_site` from accessible resources, redirects to `returnUrl?jira_connected=1&jira_site=<encoded site URL>`.

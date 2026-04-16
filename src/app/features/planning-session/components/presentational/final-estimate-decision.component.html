@@ -172,20 +172,20 @@
         <div class="fed-jira-setup__row">
           <input
             id="fed-jira-issue"
-            #jiraIssue
             type="text"
             class="fed-jira-setup__input"
             placeholder="EVRST-1386"
             spellcheck="false"
             autocomplete="off"
-            value="EVRST-"
+            [value]="jiraIssueInputDraft()"
+            (input)="onJiraIssueInput($event)"
           />
           <button
             type="button"
             uiBtn="secondary"
             uiBtnSize="sm"
             [disabled]="store.jiraMetaBusy()"
-            (click)="store.saveActiveStoryJiraIssueKey(jiraIssue.value)"
+            (click)="store.saveActiveStoryJiraIssueKey(jiraIssueInputDraft())"
           >
             Change issue
           </button>
@@ -317,9 +317,10 @@
           <select
             id="fed-jira-sprint"
             class="fed-sprint__select"
+            name="fedJiraSprint"
             [disabled]="sprintsLoading()"
-            [value]="selectedSprintSelectValue()"
-            (change)="onJiraSprintSelect($event)"
+            [ngModel]="sprintSelectModel()"
+            (ngModelChange)="onSprintSelectModelChange($event)"
           >
             <option value="">Story points only — do not change sprint</option>
             @if (sprintsActive().length > 0) {

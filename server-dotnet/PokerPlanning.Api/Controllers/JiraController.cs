@@ -2,6 +2,7 @@ using System.Text.Json;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using PokerPlanning.Api.Filters;
+using PokerPlanning.Api.Models;
 using PokerPlanning.Api.Services;
 
 namespace PokerPlanning.Api.Controllers;
@@ -163,7 +164,11 @@ public sealed class JiraController : ControllerBase
 
     [HttpGet("issues/{issueKey}")]
     [ServiceFilter(typeof(FirebaseAuthFilter))]
-    public async Task<IActionResult> GetIssue([FromRoute] string issueKey, [FromQuery] string? siteUrl, CancellationToken ct)
+    public async Task<IActionResult> GetIssue(
+        [FromRoute] string issueKey,
+        [FromQuery] string? siteUrl,
+        [FromQuery] bool includeCurrentSprint = false,
+        CancellationToken ct = default)
     {
         issueKey = issueKey.Trim();
         siteUrl = siteUrl?.Trim() ?? "";
@@ -175,7 +180,20 @@ public sealed class JiraController : ControllerBase
         var uid = HttpContext.RequireUid();
         try
         {
-            var issue = await _jira.GetIssueForUserAsync(uid, issueKey, siteUrl, ct);
+            JiraIssueDto issue;
+            int? currentSprintId = null;
+            if (includeCurrentSprint)
+            {
+                var issueTask = _jira.GetIssueForUserAsync(uid, issueKey, siteUrl, ct);
+                var sprintTask = _jira.GetCurrentSprintIdForIssueAsync(uid, issueKey, siteUrl, ct);
+                await Task.WhenAll(issueTask, sprintTask);
+                issue = await issueTask;
+                currentSprintId = await sprintTask;
+            }
+            else
+            {
+                issue = await _jira.GetIssueForUserAsync(uid, issueKey, siteUrl, ct);
+            }
             return Ok(new
             {
                 issueKey = issue.IssueKey,
@@ -191,6 +209,7 @@ public sealed class JiraController : ControllerBase
                         displayName = issue.Assignee.DisplayName,
                         emailAddress = issue.Assignee.EmailAddress,
                     },
+                currentSprintId,
             });
         }
         catch (Exception e)

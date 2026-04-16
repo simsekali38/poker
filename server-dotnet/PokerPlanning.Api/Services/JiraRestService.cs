@@ -1,3 +1,4 @@
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 using PokerPlanning.Api.Models;
@@ -39,6 +40,124 @@ public sealed class JiraRestService
         var cloudId = JiraSiteService.ResolveCloudId(resources, siteUrl);
         var issue = await FetchIssueByCloudIdAsync(http, access, cloudId, issueKey, ct);
         return (cloudId, issue);
+    }
+
+    /// <summary>
+    /// Agile API: sprint assigned to the issue. Prefers <c>active</c>, then first <c>future</c>. Null if backlog or unsupported.
+    /// </summary>
+    public async Task<int?> GetCurrentSprintIdForIssueAsync(
+        string firebaseUid,
+        string issueKey,
+        string siteUrl,
+        CancellationToken ct = default)
+    {
+        var access = await _tokens.GetValidAccessTokenAsync(firebaseUid, ct);
+        var http = _httpFactory.CreateClient();
+        var resources = await JiraSiteService.FetchAccessibleResourcesAsync(http, access, ct);
+        var cloudId = JiraSiteService.ResolveCloudId(resources, siteUrl);
+        // Request sprint explicitly — some tenants omit it without ?fields=
+        var url =
+            $"https://api.atlassian.com/ex/jira/{cloudId}/rest/agile/1.0/issue/{Uri.EscapeDataString(issueKey)}" +
+            "?fields=sprint";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new AuthenticationHeaderValue("Bearer", access);
+        req.Headers.Accept.ParseAdd("application/json");
+        var res = await http.SendAsync(req, ct);
+        var text = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            return null;
+        }
+
+        using var doc = JsonDocument.Parse(text);
+        var root = doc.RootElement;
+        if (!root.TryGetProperty("fields", out var fields) ||
+            !fields.TryGetProperty("sprint", out var sprintField))
+        {
+            return null;
+        }
+
+        return PickCurrentSprintIdFromSprintField(sprintField);
+    }
+
+    private static int? PickCurrentSprintIdFromSprintField(JsonElement sprintField)
+    {
+        if (sprintField.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+        {
+            return null;
+        }
+
+        var items = new List<(int Id, string? State)>();
+        void AddObject(JsonElement obj)
+        {
+            if (obj.ValueKind != JsonValueKind.Object)
+            {
+                return;
+            }
+
+            if (!obj.TryGetProperty("id", out var idEl))
+            {
+                return;
+            }
+
+            int id = idEl.ValueKind == JsonValueKind.Number
+                ? idEl.GetInt32()
+                : int.TryParse(idEl.GetString(), out var x)
+                    ? x
+                    : 0;
+            if (id == 0)
+            {
+                return;
+            }
+
+            var state = obj.TryGetProperty("state", out var st) ? st.GetString() : null;
+            items.Add((id, state));
+        }
+
+        if (sprintField.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var el in sprintField.EnumerateArray())
+            {
+                AddObject(el);
+            }
+        }
+        else if (sprintField.ValueKind == JsonValueKind.Object)
+        {
+            AddObject(sprintField);
+        }
+        else
+        {
+            return null;
+        }
+
+        if (items.Count == 0)
+        {
+            return null;
+        }
+
+        foreach (var (id, state) in items)
+        {
+            if (string.Equals(state, "active", StringComparison.OrdinalIgnoreCase))
+            {
+                return id;
+            }
+        }
+
+        foreach (var (id, state) in items)
+        {
+            if (string.Equals(state, "future", StringComparison.OrdinalIgnoreCase))
+            {
+                return id;
+            }
+        }
+
+        // Single sprint object often carries the active assignment; state may be missing in some responses.
+        if (items.Count == 1)
+        {
+            return items[0].Id;
+        }
+
+        return null;
     }
 
     private static async Task<JiraIssueDto> FetchIssueByCloudIdAsync(

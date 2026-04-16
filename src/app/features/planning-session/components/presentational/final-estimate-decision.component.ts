@@ -1,6 +1,7 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, computed, effect, inject, input, signal, untracked } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { FinalEstimateMethod, VoteCard } from '@app/core/models';
 import {
   JiraBoardListRow,
@@ -9,7 +10,11 @@ import {
 } from '@app/core/services/jira-planning-integration.service';
 import { JiraBackendService } from '@app/core/services/jira-backend.service';
 import { environment } from '@env/environment';
-import { parseJiraProjectKeyFromIssue } from '@app/shared/utils/jira-issue-key.utils';
+import {
+  parseJiraIssueKey,
+  parseJiraProjectKeyFromIssue,
+} from '@app/shared/utils/jira-issue-key.utils';
+import { finalize } from 'rxjs';
 import { VoteLabelPipe } from '@app/shared/pipes/vote-label.pipe';
 import { UiButtonDirective, UiPanelComponent } from '@app/shared/ui/design-system';
 import {
@@ -21,7 +26,7 @@ import { PlanningSessionStore } from '../../store/planning-session.store';
 @Component({
   selector: 'app-final-estimate-decision',
   standalone: true,
-  imports: [UiPanelComponent, UiButtonDirective, VoteLabelPipe, DecimalPipe, DatePipe],
+  imports: [UiPanelComponent, UiButtonDirective, VoteLabelPipe, DecimalPipe, DatePipe, FormsModule],
   templateUrl: './final-estimate-decision.component.html',
   styleUrl: './final-estimate-decision.component.scss',
 })
@@ -48,6 +53,12 @@ export class FinalEstimateDecisionComponent {
   protected readonly sprintsError = signal<string | null>(null);
   /** When set, issue is moved to this sprint on “Send to Jira”. */
   protected readonly selectedJiraSprintId = signal<number | null>(null);
+  /** Agile API: sprint the linked issue is in (active, else future). */
+  protected readonly jiraIssueCurrentSprintId = signal<number | null>(null);
+  /** False until GET issue (with sprint) finishes for the current story. */
+  protected readonly issueJiraSprintResolved = signal(false);
+  /** Issue key input — synced from story when story id / stored key changes. */
+  protected readonly jiraIssueInputDraft = signal('');
   /** Match Jira: hide sprints that originate from other boards (when `originBoardId` is present). */
   protected readonly sprintFilterThisBoardOnly = signal(true);
 
@@ -65,18 +76,40 @@ export class FinalEstimateDecisionComponent {
     return rows.filter((s) => s.originBoardId == null || s.originBoardId === n);
   });
 
+  /** Ensures the issue’s current sprint row appears even if “this board only” would hide it. */
+  protected readonly sprintsRowsForSelect = computed(() => {
+    const filtered = this.sprintsFiltered();
+    const mustShow = this.jiraIssueCurrentSprintId();
+    if (mustShow == null || filtered.some((s) => s.id === mustShow)) {
+      return filtered;
+    }
+    const row = this.boardSprints().find((s) => s.id === mustShow);
+    return row ? [...filtered, row] : filtered;
+  });
+
   protected readonly sprintsActive = computed(() =>
-    this.sprintsFiltered().filter((s) => s.state?.toLowerCase() === 'active'),
+    this.sprintsRowsForSelect().filter((s) => s.state?.toLowerCase() === 'active'),
   );
 
   protected readonly sprintsFuture = computed(() =>
-    this.sprintsFiltered().filter((s) => s.state?.toLowerCase() === 'future'),
+    this.sprintsRowsForSelect().filter((s) => s.state?.toLowerCase() === 'future'),
   );
+
+  /** Native `<select>` + `[value]` is unreliable with dynamic options; use ngModel string. */
+  protected readonly sprintSelectModel = computed(() => {
+    const id = this.selectedJiraSprintId();
+    return id === null || id === undefined ? '' : String(id);
+  });
 
   /** Prevents duplicate auto-apply for the same story + round. */
   private defaultRoundedAppliedKey = '';
 
   private sprintFetchKey = '';
+  private issueSprintProbeKey = '';
+  /** After auto-select succeeds or backlog confirmed, skip until story/board/filter context changes. */
+  private sprintAutoAppliedDone = false;
+  private sprintAutoAppliedContext = '';
+  private jiraIssueDraftSync: { storyId: string; issueKey: string } | null = null;
 
   constructor() {
     effect(() => {
@@ -98,6 +131,62 @@ export class FinalEstimateDecisionComponent {
       }
       this.defaultRoundedAppliedKey = key;
       untracked(() => this.store.selectRoundedAverageFinalEstimate());
+    });
+
+    effect(() => {
+      const d = this.decision();
+      const id = d.story.id;
+      const key = d.story.jiraIssueKey ?? '';
+      const prev = this.jiraIssueDraftSync;
+      if (prev && prev.storyId === id && prev.issueKey === key) {
+        return;
+      }
+      this.jiraIssueDraftSync = { storyId: id, issueKey: key };
+      untracked(() => this.jiraIssueInputDraft.set(key));
+    });
+
+    effect(() => {
+      const d = this.decision();
+      const site = d.jiraSiteUrl?.trim();
+      const issueKey = parseJiraIssueKey(d.story.jiraIssueKey ?? '');
+      if (!site || !issueKey || !d.jiraSessionReady || !d.jiraIntegrationAvailable) {
+        untracked(() => {
+          this.jiraIssueCurrentSprintId.set(null);
+          this.issueJiraSprintResolved.set(false);
+          this.issueSprintProbeKey = '';
+        });
+        return;
+      }
+      const probe = `${d.story.id}:${issueKey}:${site}`;
+      if (this.issueSprintProbeKey === probe) {
+        return;
+      }
+      untracked(() => {
+        this.issueSprintProbeKey = probe;
+        this.issueJiraSprintResolved.set(false);
+        this.jiraBackend
+          .getIssue(issueKey, site, { includeCurrentSprint: true })
+          .pipe(
+            finalize(() => {
+              this.issueJiraSprintResolved.set(true);
+            }),
+          )
+          .subscribe({
+            next: (issue) => {
+              const sid = issue.currentSprintId as number | string | null | undefined;
+              const n =
+                sid == null || sid === ''
+                  ? NaN
+                  : typeof sid === 'number'
+                    ? sid
+                    : Number(String(sid).trim());
+              this.jiraIssueCurrentSprintId.set(Number.isFinite(n) ? n : null);
+            },
+            error: () => {
+              this.jiraIssueCurrentSprintId.set(null);
+            },
+          });
+      });
     });
 
     effect(() => {
@@ -143,8 +232,21 @@ export class FinalEstimateDecisionComponent {
       untracked(() => {
         this.sprintFetchKey = key;
         this.selectedJiraSprintId.set(null);
+        this.sprintAutoAppliedDone = false;
+        this.sprintAutoAppliedContext = '';
         this.loadBoardSprints(site, bid);
       });
+    });
+
+    effect(() => {
+      const d = this.decision();
+      d.story.id;
+      d.jiraBoardId;
+      this.jiraIssueCurrentSprintId();
+      this.issueJiraSprintResolved();
+      this.boardSprints();
+      this.sprintFilterThisBoardOnly();
+      untracked(() => this.tryAutoSelectSprintFromIssue());
     });
   }
 
@@ -213,6 +315,39 @@ export class FinalEstimateDecisionComponent {
     return this.decision().jiraBoardId?.trim() ?? '';
   }
 
+  private tryAutoSelectSprintFromIssue(): void {
+    const d = this.decision();
+    const ctx = `${d.story.id}:${d.jiraBoardId?.trim() ?? ''}:${this.sprintFilterThisBoardOnly()}`;
+    if (this.sprintAutoAppliedContext !== ctx) {
+      this.sprintAutoAppliedContext = ctx;
+      this.sprintAutoAppliedDone = false;
+    }
+    if (this.sprintAutoAppliedDone) {
+      return;
+    }
+    if (!this.issueJiraSprintResolved()) {
+      return;
+    }
+    const rows = this.boardSprints();
+    if (rows.length === 0) {
+      return;
+    }
+
+    const sprintId = this.jiraIssueCurrentSprintId();
+    if (sprintId == null) {
+      this.sprintAutoAppliedDone = true;
+      return;
+    }
+
+    if (!rows.some((s) => s.id === sprintId)) {
+      this.sprintAutoAppliedDone = true;
+      return;
+    }
+
+    this.selectedJiraSprintId.set(sprintId);
+    this.sprintAutoAppliedDone = true;
+  }
+
   protected loadBoardSprints(siteUrl: string, boardId: string): void {
     this.sprintsLoading.set(true);
     this.sprintsError.set(null);
@@ -240,14 +375,14 @@ export class FinalEstimateDecisionComponent {
     });
   }
 
-  protected selectedSprintSelectValue(): string {
-    const id = this.selectedJiraSprintId();
-    return id !== null ? String(id) : '';
+  protected onSprintSelectModelChange(value: string): void {
+    this.selectedJiraSprintId.set(value === '' ? null : Number(value));
+    this.sprintAutoAppliedDone = true;
   }
 
-  protected onJiraSprintSelect(ev: Event): void {
-    const v = (ev.target as HTMLSelectElement).value;
-    this.selectedJiraSprintId.set(v === '' ? null : Number(v));
+  protected onJiraIssueInput(ev: Event): void {
+    const v = (ev.target as HTMLInputElement).value;
+    this.jiraIssueInputDraft.set(v);
   }
 
   protected toggleSprintBoardFilter(): void {

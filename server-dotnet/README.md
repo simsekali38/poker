@@ -39,23 +39,23 @@ Ortam değişkenlerini `appsettings.Development.json`, kullanıcı sırları vey
 
 ### Atlassian OAuth — `Atlassian__Scopes`
 
-[Agile board](https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/#api-rest-agile-1-0-board-get) ve sprint uçları **Jira Software** granular scope’ları ister; yalnızca `read:jira-work` ile `GET …/rest/agile/1.0/board` çağrıları **`401` + `"scope does not match"`** döner.
+[Agile board](https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/#api-rest-agile-1-0-board-get) ve sprint uçları **Jira Software** granular scope’ları ister; yalnızca klasik `read:jira-work` / `write:jira-work` ile `GET …/rest/agile/1.0/board` çağrıları **`401` + `"scope does not match"`** dönebilir. Bu projede **doğrulanmış** yapılandırma aşağıdaki **referans** satırıdır.
 
-1. [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) → uygulamanız → **Permissions** (veya OAuth 2.0) → aşağıdaki scope’ları ekleyin (isimler birebir aynı olmalı).
-2. `Atlassian__Scopes` değerini aynı kapsamları içerecek şekilde güncelleyin (boşlukla ayrılmış tek satır).
-3. Kullanıcıların **Connect Jira** ile OAuth’u yeniden yapması gerekir; eski access token yeni scope’ları taşımaz.
+**Kurulum (her ortam için aynı mantık):**
 
-**Bu API için tipik bir set** (issue okuma/yazma + board listesi + sprint listesi + tahmin senkronu + sprinte ekleme):
+1. [Atlassian Developer Console](https://developer.atlassian.com/console/myapps/) → uygulamanız → **Permissions** → **Code** sütunundaki scope’lar, referanstaki liste ile **birebir** aynı olsun.
+2. `Atlassian__Scopes` ortam değişkeni **aynı** kodları içersin (boşlukla ayrılmış tek satır). Konsol ile string uyumsuzsa token eksik yetkiyle üretilir.
+3. Scope ekledikten veya değiştirdikten sonra kullanıcılar **Connect Jira** ile OAuth’u **yeniden** tamamlamalıdır.
 
-- Platform: `offline_access`, `read:jira-work`, `write:jira-work` (gerekirse `read:jira-user`)
-- Board listesi ([resmi dokümantasyon](https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/#api-rest-agile-1-0-board-get)): `read:board-scope:jira-software` **ve** `read:project:jira`
-- Sprint listesi: `read:sprint:jira-software`
-- Sprinte issue ekleme (`POST …/sprint/{id}/issue`): `write:sprint:jira-software`
-- Board üzerinden story point (Agile estimation): `write:board-scope:jira-software`
+#### Referans — doğrulanmış `Atlassian__Scopes` (kopyala-yapıştır)
 
-Örnek (ortam değişkeni değeri — kendi ihtiyacınıza göre kısaltıp genişletin):
+Granular Jira + Jira Software; refresh için `offline_access` dahil:
 
-`offline_access read:jira-work write:jira-work read:jira-user read:board-scope:jira-software read:project:jira read:sprint:jira-software write:sprint:jira-software write:board-scope:jira-software`
+```
+offline_access read:dashboard:jira write:dashboard:jira read:dashboard.property:jira write:dashboard.property:jira read:issue-details:jira read:project:jira read:board-scope.admin:jira-software write:board-scope.admin:jira-software read:board-scope:jira-software write:board-scope:jira-software read:issue:jira-software write:issue:jira-software read:sprint:jira-software write:sprint:jira-software
+```
+
+Üretimde tek satır olarak verin (satır sonu yok). İhtiyaç az ise bu listeden gereksiz scope’ları **hem konsoldan hem** `Atlassian__Scopes`’tan birlikte kaldırın; asgari board listesi için [resmi olarak](https://developer.atlassian.com/cloud/jira/software/rest/api-group-board/#api-rest-agile-1-0-board-get) `read:board-scope:jira-software` ve `read:project:jira` şarttır.
 
 ## IIS (Plesk)
 
