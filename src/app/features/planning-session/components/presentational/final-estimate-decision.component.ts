@@ -164,6 +164,8 @@ export class FinalEstimateDecisionComponent {
       untracked(() => {
         this.issueSprintProbeKey = probe;
         this.issueJiraSprintResolved.set(false);
+        this.jiraIssueCurrentSprintId.set(null);
+        this.selectedJiraSprintId.set(null);
         this.jiraBackend
           .getIssue(issueKey, site, { includeCurrentSprint: true })
           .pipe(
@@ -317,7 +319,8 @@ export class FinalEstimateDecisionComponent {
 
   private tryAutoSelectSprintFromIssue(): void {
     const d = this.decision();
-    const ctx = `${d.story.id}:${d.jiraBoardId?.trim() ?? ''}:${this.sprintFilterThisBoardOnly()}`;
+    const issueNorm = parseJiraIssueKey(d.story.jiraIssueKey ?? '') ?? '';
+    const ctx = `${d.story.id}:${issueNorm}:${d.jiraBoardId?.trim() ?? ''}:${this.sprintFilterThisBoardOnly()}`;
     if (this.sprintAutoAppliedContext !== ctx) {
       this.sprintAutoAppliedContext = ctx;
       this.sprintAutoAppliedDone = false;

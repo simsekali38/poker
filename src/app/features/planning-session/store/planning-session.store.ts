@@ -6,11 +6,13 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { Vote, VoteCard } from '@app/core/models';
 import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
 import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
+import { JiraBackendService } from '@app/core/services/jira-backend.service';
 import { JiraPlanningIntegrationService } from '@app/core/services/jira-planning-integration.service';
 import { SessionModerationService } from '@app/core/services/session-moderation.service';
 import { isFirebasePermissionDenied } from '@app/core/utils/firebase-error.utils';
 import { isSessionModerationError } from '@app/core/utils/session-moderation-error.utils';
 import {
+  catchError,
   combineLatest,
   concat,
   distinctUntilChanged,
@@ -65,6 +67,7 @@ export class PlanningSessionStore {
   private readonly votes = inject(VOTE_REPOSITORY);
   private readonly moderation = inject(SessionModerationService);
   private readonly jira = inject(JiraPlanningIntegrationService);
+  private readonly jiraBackend = inject(JiraBackendService);
 
   readonly actionError = signal<string | null>(null);
   readonly moderationBusy = signal(false);
@@ -379,7 +382,7 @@ export class PlanningSessionStore {
       });
   }
 
-  /** Persist Jira issue key on the active story (moderator). */
+  /** Persist Jira issue key on the active story (moderator). Loads summary/description from Jira when possible. */
   saveActiveStoryJiraIssueKey(raw: string): void {
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
@@ -388,15 +391,33 @@ export class PlanningSessionStore {
     }
     this.actionError.set(null);
     this.jiraMetaBusy.set(true);
-    this.moderation
-      .setActiveStoryJiraIssueKey(sid, uid, raw)
-      .pipe(
-        take(1),
-        finalize(() => this.jiraMetaBusy.set(false)),
-      )
-      .subscribe({
-        error: (err: unknown) => this.setActionErrorFromUnknown(err),
-      });
+
+    const vm = this.roomView();
+    const site = vm?.jiraSiteUrl?.trim() ?? '';
+    const trimmed = raw.trim();
+    const issueKey = parseJiraIssueKey(trimmed);
+
+    const canSyncStoryText =
+      environment.jiraIntegrationEnabled &&
+      Boolean(environment.jiraBackendApiUrl?.trim()) &&
+      site.length > 0 &&
+      issueKey !== null;
+
+    const pipeline = canSyncStoryText
+      ? this.jiraBackend.getIssue(issueKey, site).pipe(
+          switchMap((issue) =>
+            this.moderation.setActiveStoryJiraIssueKey(sid, uid, raw, {
+              title: issue.summary?.trim() ? issue.summary.trim() : issueKey,
+              description: issue.description ?? '',
+            }),
+          ),
+          catchError(() => this.moderation.setActiveStoryJiraIssueKey(sid, uid, raw)),
+        )
+      : this.moderation.setActiveStoryJiraIssueKey(sid, uid, raw);
+
+    pipeline.pipe(take(1), finalize(() => this.jiraMetaBusy.set(false))).subscribe({
+      error: (err: unknown) => this.setActionErrorFromUnknown(err),
+    });
   }
 
   selectConsensusFinalEstimate(): void {

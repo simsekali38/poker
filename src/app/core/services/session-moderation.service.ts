@@ -3,7 +3,7 @@ import { serverTimestamp } from '@angular/fire/firestore';
 import { DEFAULT_ROUND_TIMER_DURATION_SEC, FinalEstimateMethod, VoteCard } from '@app/core/models';
 import { Observable, catchError, concatMap, of, switchMap, throwError } from 'rxjs';
 import { SESSION_REPOSITORY, STORY_REPOSITORY, VOTE_REPOSITORY } from '@app/core/tokens/repository.tokens';
-import { CreateSessionStoryParams } from '@app/data/repositories/story.repository';
+import { CreateSessionStoryParams, UpdateStoryPatch } from '@app/data/repositories/story.repository';
 import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
 import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
 
@@ -368,7 +368,12 @@ export class SessionModerationService {
   }
 
   /** Sets `jiraIssueKey` on the active story (moderator only). Empty string clears the key. */
-  setActiveStoryJiraIssueKey(sessionId: string, moderatorUid: string, rawIssueKey: string): Observable<void> {
+  setActiveStoryJiraIssueKey(
+    sessionId: string,
+    moderatorUid: string,
+    rawIssueKey: string,
+    fromJira?: { readonly title: string; readonly description: string } | null,
+  ): Observable<void> {
     const sid = sessionId.trim();
     if (!sid) {
       return throwError(() => this.err('SESSION_NOT_FOUND'));
@@ -393,7 +398,12 @@ export class SessionModerationService {
         if (!storyId) {
           return throwError(() => this.err('NO_ACTIVE_STORY'));
         }
-        return this.stories.updateStory(sid, storyId, { jiraIssueKey: parsed });
+        const patch: UpdateStoryPatch = { jiraIssueKey: parsed };
+        if (parsed !== null && fromJira) {
+          patch.title = fromJira.title;
+          patch.description = fromJira.description;
+        }
+        return this.stories.updateStory(sid, storyId, patch);
       }),
     );
   }
