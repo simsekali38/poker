@@ -11,6 +11,8 @@ const MODERATION_CODES: ReadonlySet<string> = new Set<SessionModerationFailure>(
   'INVALID_JIRA_ISSUE_KEY',
   'INVALID_JIRA_SITE',
   'INVALID_JIRA_BOARD_ID',
+  'TRANSFER_INVALID_MEMBER',
+  'TRANSFER_SAME_AS_CURRENT',
 ]);
 
 export type SessionModerationError = Error & { moderationCode: SessionModerationFailure };

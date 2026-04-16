@@ -1,4 +1,4 @@
-import { Component, input } from '@angular/core';
+import { Component, input, output } from '@angular/core';
 import { VoteLabelPipe } from '@app/shared/pipes/vote-label.pipe';
 import { ParticipantRowVm } from '../../models/planning-room.view-model';
 
@@ -12,6 +12,10 @@ import { ParticipantRowVm } from '../../models/planning-room.view-model';
 export class RoomParticipantListComponent {
   readonly rows = input<ParticipantRowVm[]>([]);
   readonly votesRevealed = input(false);
+  /** Current user is moderator and may hand off the role. */
+  readonly canTransferModerator = input(false);
+  readonly transferBusy = input(false);
+  readonly requestTransferModerator = output<string>();
 
   protected trackRow(_i: number, r: ParticipantRowVm): string {
     return r.memberId;

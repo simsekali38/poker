@@ -17,19 +17,85 @@
 
   @if (isModerator() && addFormOpen()) {
     <form class="history__form" [formGroup]="createForm" (ngSubmit)="submitNew()">
-      <label class="field">
-        <span class="field__label">Title</span>
-        <input class="ui-input" type="text" formControlName="title" autocomplete="off" />
-      </label>
-      <label class="field">
-        <span class="field__label">Description <span class="optional">(optional)</span></span>
-        <textarea class="ui-input field__textarea" formControlName="description" rows="2"></textarea>
-      </label>
+      @if (jiraStoryImportAvailable()) {
+        <div class="history__jira">
+          <span class="field__label">Jira issue</span>
+          @if (loadedJiraIssueKey(); as loadedKey) {
+            <div class="history__jira-row history__jira-row--locked">
+              <code class="history__jira-key">{{ loadedKey }}</code>
+              <button
+                type="button"
+                uiBtn="ghost"
+                uiBtnSize="sm"
+                [disabled]="busy() || jiraLoadBusy()"
+                (click)="clearJiraLoad()"
+              >
+                Change issue
+              </button>
+            </div>
+          } @else {
+            <div class="history__jira-row">
+              <input
+                class="ui-input"
+                type="text"
+                [formControl]="jiraKeyDraft"
+                autocomplete="off"
+                placeholder="EVRST-1386"
+                [attr.aria-busy]="jiraLoadBusy()"
+              />
+              <button
+                type="button"
+                uiBtn="secondary"
+                [disabled]="busy() || jiraLoadBusy()"
+                [uiBtnLoading]="jiraLoadBusy()"
+                (click)="fetchFromJira()"
+              >
+                Load from Jira
+              </button>
+            </div>
+          }
+          @if (jiraLoadMessage(); as msg) {
+            <p class="history__jira-msg" role="status">{{ msg }}</p>
+          }
+          @if (loadedJiraIssueKey()) {
+            <div class="history__preview" aria-live="polite">
+              <span class="field__label">From Jira</span>
+              <p class="history__preview-title">{{ createForm.controls.title.value }}</p>
+              @if (createForm.controls.description.value.trim(); as desc) {
+                <p class="history__preview-desc">{{ desc }}</p>
+              } @else {
+                <p class="history__preview-desc history__preview-desc--empty">No description in Jira.</p>
+              }
+            </div>
+          }
+        </div>
+      } @else if (env.jiraIntegrationEnabled) {
+        <p class="history__jira-hint">
+          Link a Jira site URL in session settings to load stories by issue key.
+        </p>
+      }
+
+      @if (!jiraStoryImportAvailable()) {
+        <label class="field">
+          <span class="field__label">Title</span>
+          <input class="ui-input" type="text" formControlName="title" autocomplete="off" />
+        </label>
+        <label class="field">
+          <span class="field__label">Description <span class="optional">(optional)</span></span>
+          <textarea class="ui-input field__textarea" formControlName="description" rows="2"></textarea>
+        </label>
+      }
+
       <label class="check">
         <input type="checkbox" formControlName="makeActive" />
         <span>Set as current story</span>
       </label>
-      <button type="submit" uiBtn="primary" [disabled]="busy() || createForm.invalid" [uiBtnLoading]="busy()">
+      <button
+        type="submit"
+        uiBtn="primary"
+        [disabled]="busy() || createForm.invalid || (jiraStoryImportAvailable() && !loadedJiraIssueKey())"
+        [uiBtnLoading]="busy()"
+      >
         Create story
       </button>
     </form>

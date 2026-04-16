@@ -1,3 +1,4 @@
+import { environment } from '@env/environment';
 import { Session, SessionMember, Story, Vote } from '@app/core/models';
 import { formatSessionCodeForDisplay } from '@app/shared/utils/session-code.utils';
 import { everyoneActiveOnlineHasVoted } from '@app/shared/utils/everyone-voted.util';
@@ -116,6 +117,13 @@ export function buildPlanningRoomViewModel(
 
   const jiraSiteUrl = session.settings.jiraSiteUrl?.trim() || null;
   const jiraBoardId = session.settings.jiraBoardId?.trim() || null;
+  const jiraStoryImportAvailable =
+    environment.jiraIntegrationEnabled &&
+    Boolean(environment.jiraBackendApiUrl?.trim()) &&
+    session.settings.jiraIntegrationEnabled !== false &&
+    jiraSiteUrl !== null;
+
+  const autoRevealWhenAllVoted = session.settings.autoRevealWhenAllVoted !== false;
 
   return {
     sessionId: session.id,
@@ -147,5 +155,7 @@ export function buildPlanningRoomViewModel(
     finalEstimate,
     jiraSiteUrl,
     jiraBoardId,
+    jiraStoryImportAvailable,
+    autoRevealWhenAllVoted,
   };
 }

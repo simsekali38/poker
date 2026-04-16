@@ -35,7 +35,7 @@ export interface FinalEstimateDecisionVm {
   readonly jiraSiteUrl: string | null;
   /** True when the session has a linked Jira site or OAuth completed. */
   readonly jiraSessionReady: boolean;
-  /** Story has a valid `PROJ-123` style key. */
+  /** Story has a valid `EVRST-1386` style key. */
   readonly hasValidJiraIssueKey: boolean;
   /** Optional Scrum board id from `session.settings` (Jira Agile estimation). */
   readonly jiraBoardId: string | null;
@@ -103,7 +103,7 @@ export function buildFinalEstimateDecisionVm(args: {
     jiraActionHint =
       'Add your Jira site URL below or use Connect Jira before sending the estimate.';
   } else if (!hasValidJiraIssueKey) {
-    jiraActionHint = 'Enter the Jira issue key for this story (for example PROJ-123) before sending.';
+    jiraActionHint = 'Enter the Jira issue key for this story (for example EVRST-1386) before sending.';
   }
 
   const canSendToJira =

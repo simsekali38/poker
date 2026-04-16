@@ -9,6 +9,8 @@ export interface CreateSessionStoryParams {
   makeActive: boolean;
   /** `session.activeStoryId` before activation; will be marked `completed` when `makeActive` and non-null. */
   previousActiveStoryId: string | null;
+  /** When set (e.g. loaded from Jira), stored on the story document. */
+  jiraIssueKey?: string | null;
 }
 
 export interface UpdateStoryPatch {
@@ -21,7 +23,7 @@ export interface UpdateStoryPatch {
   clearFinalEstimateState?: boolean;
   /** When true, sets `jiraSyncedAt` to server time. */
   markJiraSynced?: boolean;
-  /** Target issue key (`PROJ-123`). `null` removes the field. */
+  /** Target issue key (`EVRST-1386`). `null` removes the field. */
   jiraIssueKey?: string | null;
 }
 

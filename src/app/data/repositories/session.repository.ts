@@ -18,6 +18,11 @@ export interface SessionJiraSettingsPatch {
   jiraBoardId?: string | null;
 }
 
+/** Session voting behavior flags under `settings.*`. */
+export interface SessionBehaviorSettingsPatch {
+  autoRevealWhenAllVoted?: boolean;
+}
+
 export interface CreateSessionAsModeratorParams {
   sessionTitle: string;
   moderatorDisplayName: string;
@@ -29,7 +34,7 @@ export interface CreateSessionAsModeratorParams {
   jiraSiteUrl?: string | null;
   /** Set when OAuth redirect succeeded or user confirmed site for this session. */
   jiraConnected?: boolean;
-  /** Optional issue key for the first story (e.g. PROJ-123). */
+  /** Optional issue key for the first story (e.g. EVRST-1386). */
   initialStoryJiraIssueKey?: string | null;
 }
 
@@ -73,4 +78,16 @@ export interface SessionRepository {
 
   /** Updates `settings.jiraSiteUrl` / `settings.jiraConnected` (moderator-only in rules). */
   patchJiraSettings(sessionId: string, patch: SessionJiraSettingsPatch): Observable<void>;
+
+  /** Updates `settings.autoRevealWhenAllVoted` (moderator-only in rules). */
+  patchBehaviorSettings(sessionId: string, patch: SessionBehaviorSettingsPatch): Observable<void>;
+
+  /**
+   * Sets `moderatorId` and updates both members' `role` fields (moderator-only).
+   */
+  transferModerator(
+    sessionId: string,
+    previousModeratorUid: string,
+    newModeratorUid: string,
+  ): Observable<void>;
 }

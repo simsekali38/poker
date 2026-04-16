@@ -79,7 +79,7 @@ Stored in existing collections (no separate “Jira collection” required):
 
 | Field | Type | Purpose |
 |--------|------|--------|
-| `jiraIssueKey` | string | e.g. `PROJ-123` |
+| `jiraIssueKey` | string | e.g. `EVRST-1386` |
 | `jiraSyncedAt` | timestamp | Set when estimate successfully pushed to Jira |
 
 Issue metadata (summary, status, …) is **not** duplicated in Firestore by default; it is loaded on demand from the backend.

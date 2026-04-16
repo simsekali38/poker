@@ -19,6 +19,7 @@ import { Observable, defer, from, map, of } from 'rxjs';
 import { Story } from '@app/core/models';
 import { SESSIONS_COLLECTION } from '@app/data/firebase/firestore-paths';
 import { mapStoryDocument, mapStorySnapshot } from '@app/data/mappers/story-doc.mapper';
+import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
 import { generateEntityId } from '@app/shared/utils/id.utils';
 import {
   CreateSessionStoryParams,
@@ -88,6 +89,10 @@ export class FirestoreStoryRepository implements StoryRepository {
     const batch = writeBatch(this.firestore);
 
     const status = params.makeActive ? 'active' : 'draft';
+    const jiraKey =
+      params.jiraIssueKey != null && String(params.jiraIssueKey).trim() !== ''
+        ? parseJiraIssueKey(String(params.jiraIssueKey))
+        : null;
     batch.set(storyRef, {
       title,
       description,
@@ -98,7 +103,7 @@ export class FirestoreStoryRepository implements StoryRepository {
       finalEstimateMethod: null,
       finalEstimateCard: null,
       jiraSyncedAt: null,
-      jiraIssueKey: null,
+      jiraIssueKey: jiraKey,
     });
 
     if (params.makeActive) {

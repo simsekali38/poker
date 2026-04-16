@@ -21,6 +21,7 @@ import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
 import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
 import {
   CreateSessionAsModeratorParams,
+  SessionBehaviorSettingsPatch,
   SessionJiraSettingsPatch,
   SessionRepository,
   SessionRoundTimerPatch,
@@ -78,6 +79,20 @@ export class FirestoreSessionRepository implements SessionRepository {
 
   patchJiraSettings(sessionId: string, patch: SessionJiraSettingsPatch): Observable<void> {
     return defer(() => from(this.commitPatchJiraSettings(sessionId.trim(), patch)));
+  }
+
+  patchBehaviorSettings(sessionId: string, patch: SessionBehaviorSettingsPatch): Observable<void> {
+    return defer(() => from(this.commitPatchBehaviorSettings(sessionId.trim(), patch)));
+  }
+
+  transferModerator(
+    sessionId: string,
+    previousModeratorUid: string,
+    newModeratorUid: string,
+  ): Observable<void> {
+    return defer(() =>
+      from(this.commitTransferModerator(sessionId.trim(), previousModeratorUid, newModeratorUid)),
+    );
   }
 
   private async commitReveal(sessionId: string, revealedByMemberId: string): Promise<void> {
@@ -161,6 +176,7 @@ export class FirestoreSessionRepository implements SessionRepository {
       deckPresetId: params.deckPresetId,
       cards: [...deckCards],
       allowVoteChangesBeforeReveal: true,
+      autoRevealWhenAllVoted: true,
     };
     if (siteNorm) {
       settings['jiraSiteUrl'] = siteNorm;
@@ -249,5 +265,48 @@ export class FirestoreSessionRepository implements SessionRepository {
       updates['roundTimer.startedAt'] = patch.startedAt;
     }
     await updateDoc(ref, updates as DocumentData);
+  }
+
+  private async commitPatchBehaviorSettings(
+    sessionId: string,
+    patch: SessionBehaviorSettingsPatch,
+  ): Promise<void> {
+    const ref = doc(this.firestore, SESSIONS_COLLECTION, sessionId);
+    const updates: DocumentData = { updatedAt: serverTimestamp() };
+    if (patch.autoRevealWhenAllVoted !== undefined) {
+      updates['settings.autoRevealWhenAllVoted'] = patch.autoRevealWhenAllVoted;
+    }
+    await updateDoc(ref, updates as DocumentData);
+  }
+
+  private async commitTransferModerator(
+    sessionId: string,
+    previousModeratorUid: string,
+    newModeratorUid: string,
+  ): Promise<void> {
+    if (previousModeratorUid === newModeratorUid) {
+      return;
+    }
+    const sessionRef = doc(this.firestore, SESSIONS_COLLECTION, sessionId);
+    const oldMemberRef = doc(this.firestore, SESSIONS_COLLECTION, sessionId, 'members', previousModeratorUid);
+    const newMemberRef = doc(this.firestore, SESSIONS_COLLECTION, sessionId, 'members', newModeratorUid);
+    const newSnap = await getDoc(newMemberRef);
+    if (!newSnap.exists()) {
+      throw new Error('TRANSFER_INVALID_MEMBER');
+    }
+    const batch = writeBatch(this.firestore);
+    batch.update(sessionRef, {
+      moderatorId: newModeratorUid,
+      updatedAt: serverTimestamp(),
+    });
+    batch.update(oldMemberRef, {
+      role: 'participant',
+      updatedAt: serverTimestamp(),
+    });
+    batch.update(newMemberRef, {
+      role: 'moderator',
+      updatedAt: serverTimestamp(),
+    });
+    await batch.commit();
   }
 }

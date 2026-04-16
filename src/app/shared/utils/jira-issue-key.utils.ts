@@ -1,4 +1,4 @@
-/** Normalizes and validates a Jira issue key (`PROJ-123`). Returns `null` if invalid. */
+/** Normalizes and validates a Jira issue key (`EVRST-1386`). Returns `null` if invalid. */
 export function parseJiraIssueKey(raw: string | null | undefined): string | null {
   if (raw === null || raw === undefined) {
     return null;

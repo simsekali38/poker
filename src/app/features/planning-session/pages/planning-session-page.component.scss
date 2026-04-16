@@ -9,7 +9,8 @@
 @media (min-width: 900px) {
   .layout {
     display: grid;
-    grid-template-columns: 280px minmax(0, 1fr);
+    /* Wider session sidebar (participants + stories); main column takes remaining space. */
+    grid-template-columns: minmax(320px, 22rem) minmax(0, 1fr);
     gap: var(--space-5);
     align-items: start;
   }
@@ -28,7 +29,8 @@
 
 @media (min-width: 900px) {
   .layout__side {
-    width: 280px;
+    width: 100%;
+    max-width: 22rem;
   }
 }
 

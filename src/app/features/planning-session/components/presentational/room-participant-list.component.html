@@ -30,6 +30,18 @@
           <span class="member__vote-label member__vote-label--pending">Not voted</span>
         }
       </div>
+      @if (canTransferModerator() && !p.isModerator) {
+        <div class="member__actions">
+          <button
+            type="button"
+            class="member__make-mod"
+            [disabled]="transferBusy()"
+            (click)="requestTransferModerator.emit(p.memberId)"
+          >
+            Make moderator
+          </button>
+        </div>
+      }
     </li>
   }
 </ul>

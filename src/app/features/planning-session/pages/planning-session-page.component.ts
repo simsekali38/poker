@@ -102,7 +102,8 @@ export class PlanningSessionPageComponent implements OnInit {
     title: string;
     description: string;
     makeActive: boolean;
+    jiraIssueKey?: string | null;
   }): void {
-    this.store.createStory(payload.title, payload.description, payload.makeActive);
+    this.store.createStory(payload.title, payload.description, payload.makeActive, payload.jiraIssueKey);
   }
 }

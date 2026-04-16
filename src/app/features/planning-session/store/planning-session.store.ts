@@ -39,6 +39,7 @@ import {
   inactiveVotesCoordinationKey,
   voteRoundCoordinationKey,
 } from './planning-room-stream.utils';
+import { environment } from '@env/environment';
 import { roundTimerRemainingSec as computeRoundTimerRemaining } from '@app/shared/utils/round-timer-remaining.util';
 
 type RoomStreamState =
@@ -85,14 +86,19 @@ export class PlanningSessionStore {
    */
   private readonly pendingLocalVote = signal<PendingLocalVote | null>(null);
 
-  /** Ticks once per second so `roundTimerRemainingSec` stays current while the room is open. */
-  private readonly timerClock = toSignal(interval(1000).pipe(startWith(0)), { initialValue: 0 });
+  /**
+   * Ticks once per second so `roundTimerRemainingSec` stays current while the room is open.
+   * Skipped when the timer UI is disabled in environment (no interval subscription).
+   */
+  private readonly timerClock = environment.roundTimerUiEnabled
+    ? toSignal(interval(1000).pipe(startWith(0)), { initialValue: 0 })
+    : signal(0);
 
   /** Remaining seconds while `roundTimer.isRunning`; `null` when stopped. */
   readonly roundTimerRemainingSec = computed(() => {
     this.timerClock();
     const vm = this.roomView();
-    if (!vm) {
+    if (!vm || !environment.roundTimerUiEnabled) {
       return null;
     }
     return computeRoundTimerRemaining(vm.roundTimer, Date.now());
@@ -230,6 +236,10 @@ export class PlanningSessionStore {
     return localVote === base.localVote ? base : { ...base, localVote };
   });
 
+  /** Dedupe auto-reveal attempts per session story round (`sid:storyId:epoch`). */
+  private readonly autoRevealAttempted = new Set<string>();
+  private prevSessionIdForAutoReveal: string | null = null;
+
   constructor() {
     effect(() => {
       const base = this.planningRoom().view;
@@ -244,6 +254,55 @@ export class PlanningSessionStore {
       if (base.localVote === pending.card) {
         untracked(() => this.pendingLocalVote.set(null));
       }
+    });
+
+    effect(() => {
+      const sid = this.sessionId();
+      untracked(() => {
+        if (sid !== this.prevSessionIdForAutoReveal) {
+          this.prevSessionIdForAutoReveal = sid;
+          this.autoRevealAttempted.clear();
+        }
+      });
+    });
+
+    effect(() => {
+      const vm = this.roomView();
+      const sid = this.sessionId();
+      const uid = this.auth.currentUser?.uid;
+      if (!vm || !sid || !uid) {
+        return;
+      }
+      if (!vm.autoRevealWhenAllVoted || !vm.isModerator) {
+        return;
+      }
+      if (!vm.everyoneActiveVoted || vm.votesRevealed || !vm.activeStoryId || !vm.canReveal) {
+        return;
+      }
+      if (this.moderationBusy()) {
+        return;
+      }
+      const key = `${sid}:${vm.activeStoryId}:${vm.roundEpoch}`;
+      if (this.autoRevealAttempted.has(key)) {
+        return;
+      }
+      this.autoRevealAttempted.add(key);
+      untracked(() => {
+        this.actionError.set(null);
+        this.moderationBusy.set(true);
+        this.moderation
+          .revealVotes(sid, uid)
+          .pipe(
+            take(1),
+            finalize(() => this.moderationBusy.set(false)),
+          )
+          .subscribe({
+            error: (err: unknown) => {
+              this.autoRevealAttempted.delete(key);
+              this.setActionErrorFromUnknown(err);
+            },
+          });
+      });
     });
   }
 
@@ -544,6 +603,9 @@ export class PlanningSessionStore {
   }
 
   startRoundTimer(): void {
+    if (!environment.roundTimerUiEnabled) {
+      return;
+    }
     const vm = this.roomView();
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
@@ -564,6 +626,9 @@ export class PlanningSessionStore {
   }
 
   stopRoundTimer(): void {
+    if (!environment.roundTimerUiEnabled) {
+      return;
+    }
     const vm = this.roomView();
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
@@ -584,6 +649,9 @@ export class PlanningSessionStore {
   }
 
   resetRoundTimer(): void {
+    if (!environment.roundTimerUiEnabled) {
+      return;
+    }
     const vm = this.roomView();
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
@@ -604,6 +672,9 @@ export class PlanningSessionStore {
   }
 
   setRoundTimerDuration(durationSec: number): void {
+    if (!environment.roundTimerUiEnabled) {
+      return;
+    }
     const vm = this.roomView();
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
@@ -623,7 +694,12 @@ export class PlanningSessionStore {
       });
   }
 
-  createStory(title: string, description: string, makeActive: boolean): void {
+  createStory(
+    title: string,
+    description: string,
+    makeActive: boolean,
+    jiraIssueKey?: string | null,
+  ): void {
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
     if (!uid || !sid || this.storyActionBusy()) {
@@ -636,7 +712,7 @@ export class PlanningSessionStore {
     this.actionError.set(null);
     this.storyActionBusy.set(true);
     this.moderation
-      .createStory(sid, uid, { title, description, makeActive })
+      .createStory(sid, uid, { title, description, makeActive, jiraIssueKey: jiraIssueKey ?? null })
       .pipe(
         take(1),
         finalize(() => this.storyActionBusy.set(false)),
@@ -686,6 +762,53 @@ export class PlanningSessionStore {
       .pipe(
         take(1),
         finalize(() => this.storyActionBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  /** Current moderator only — hands role to another participant who has already joined. */
+  transferModeratorTo(newModeratorMemberId: string): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    const next = newModeratorMemberId.trim();
+    if (!uid || !sid || !next || this.moderationBusy()) {
+      return;
+    }
+    if (next === uid) {
+      return;
+    }
+    this.actionError.set(null);
+    this.moderationBusy.set(true);
+    this.moderation
+      .transferModerator(sid, uid, next)
+      .pipe(
+        take(1),
+        finalize(() => this.moderationBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  setAutoRevealWhenAllVoted(enabled: boolean): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    if (!uid || !sid || this.moderationBusy()) {
+      return;
+    }
+    const vm = this.roomView();
+    if (!vm?.isModerator) {
+      return;
+    }
+    this.actionError.set(null);
+    this.moderationBusy.set(true);
+    this.moderation
+      .setAutoRevealWhenAllVoted(sid, uid, enabled)
+      .pipe(
+        take(1),
+        finalize(() => this.moderationBusy.set(false)),
       )
       .subscribe({
         error: (err: unknown) => this.setActionErrorFromUnknown(err),

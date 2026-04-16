@@ -7,6 +7,14 @@ import { Component, input } from '@angular/core';
 @Component({
   selector: 'app-ui-panel',
   standalone: true,
+  styles: [
+    `
+      :host {
+        display: block;
+        min-width: 0;
+      }
+    `,
+  ],
   template: `
     <section
       class="ui-panel"

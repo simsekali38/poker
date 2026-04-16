@@ -1,4 +1,8 @@
-<section class="planning-main" aria-label="Voting">
+<section
+  class="planning-main"
+  [class.planning-main--no-timer]="!roundTimerUiEnabled"
+  aria-label="Voting"
+>
   <div class="planning-main__story">
     <app-story-panel
       [story]="vm().story"
@@ -13,32 +17,62 @@
     }
   </div>
 
-  <div class="planning-main__timer">
-    <app-room-circular-timer
-      [remainingSec]="sessionStore.roundTimerRemainingSec()"
-      [durationSec]="vm().roundTimer.durationSec"
-      [isRunning]="vm().roundTimer.isRunning"
-      [isModerator]="vm().isModerator"
-      [busy]="sessionStore.timerBusy()"
-      (start)="sessionStore.startRoundTimer()"
-      (stop)="sessionStore.stopRoundTimer()"
-      (reset)="sessionStore.resetRoundTimer()"
-      (durationChange)="sessionStore.setRoundTimerDuration($event)"
-    />
-  </div>
+  @if (roundTimerUiEnabled) {
+    <div class="planning-main__timer">
+      <app-room-circular-timer
+        [remainingSec]="sessionStore.roundTimerRemainingSec()"
+        [durationSec]="vm().roundTimer.durationSec"
+        [isRunning]="vm().roundTimer.isRunning"
+        [isModerator]="vm().isModerator"
+        [busy]="sessionStore.timerBusy()"
+        (start)="sessionStore.startRoundTimer()"
+        (stop)="sessionStore.stopRoundTimer()"
+        (reset)="sessionStore.resetRoundTimer()"
+        (durationChange)="sessionStore.setRoundTimerDuration($event)"
+      />
+    </div>
+  }
 
-  <div class="planning-main__progress">
-    <app-ui-panel title="Round progress" [hover]="true" [labelledBy]="'round-progress-h'">
-      <app-room-voting-status
-        [votedCount]="vm().votedCount"
-        [participantCount]="vm().participantCount"
+  <section class="planning-main__progress" aria-labelledby="round-progress-h">
+    <div class="planning-main__progress-inner">
+      <h2 id="round-progress-h" class="planning-main__progress-title">Round progress</h2>
+      <div class="planning-main__progress-status">
+        <app-room-voting-status
+          [votedCount]="vm().votedCount"
+          [participantCount]="vm().participantCount"
+          [votesRevealed]="vm().votesRevealed"
+        />
+      </div>
+    </div>
+  </section>
+
+  <div class="planning-main__moderate">
+    <app-ui-panel
+      [title]="vm().isModerator ? 'Moderator controls' : 'Reveal'"
+      [compact]="true"
+      [hover]="true"
+      [labelledBy]="'moderator-controls-h'"
+    >
+      @if (vm().isModerator) {
+        <p class="ui-section-helper planning-main__mod-hint">Run the round after everyone has picked a card.</p>
+      }
+      <app-reveal-controls
+        [isModerator]="vm().isModerator"
         [votesRevealed]="vm().votesRevealed"
+        [canReveal]="vm().canReveal"
+        [canResetRound]="vm().canResetRound"
+        [votesReadyToReveal]="vm().isModerator && vm().everyoneActiveVoted && !vm().votesRevealed"
+        [autoRevealWhenAllVoted]="vm().autoRevealWhenAllVoted"
+        [busy]="moderationBusy()"
+        (reveal)="reveal.emit()"
+        (resetRound)="resetRound.emit()"
+        (autoRevealWhenAllVotedChange)="sessionStore.setAutoRevealWhenAllVoted($event)"
       />
     </app-ui-panel>
   </div>
 
   <div class="planning-main__vote">
-    <app-ui-panel title="Your vote" [hover]="true" [labelledBy]="'your-vote-h'">
+    <app-ui-panel title="Your vote" [compact]="true" [hover]="true" [labelledBy]="'your-vote-h'">
       <app-room-everyone-voted-banner
         [everyoneActiveVoted]="vm().everyoneActiveVoted"
         [votesRevealed]="vm().votesRevealed"
@@ -68,28 +102,6 @@
           Join this session with your display name to vote, or wait for the next round.
         </p>
       }
-    </app-ui-panel>
-  </div>
-
-  <div class="planning-main__moderate">
-    <app-ui-panel
-      [title]="vm().isModerator ? 'Moderator controls' : 'Reveal'"
-      [hover]="true"
-      [labelledBy]="'moderator-controls-h'"
-    >
-      @if (vm().isModerator) {
-        <p class="ui-section-helper mb-2 mt-0">Run the round after everyone has picked a card.</p>
-      }
-      <app-reveal-controls
-        [isModerator]="vm().isModerator"
-        [votesRevealed]="vm().votesRevealed"
-        [canReveal]="vm().canReveal"
-        [canResetRound]="vm().canResetRound"
-        [votesReadyToReveal]="vm().isModerator && vm().everyoneActiveVoted && !vm().votesRevealed"
-        [busy]="moderationBusy()"
-        (reveal)="reveal.emit()"
-        (resetRound)="resetRound.emit()"
-      />
     </app-ui-panel>
   </div>
 

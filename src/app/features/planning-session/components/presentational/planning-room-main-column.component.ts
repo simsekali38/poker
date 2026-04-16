@@ -40,6 +40,9 @@ export class PlanningRoomMainColumnComponent {
   protected readonly jiraIssuePreviewEnabled =
     environment.jiraIntegrationEnabled && Boolean(environment.jiraBackendApiUrl?.trim());
 
+  /** Round timer widget + Firestore timer actions (see `environment.roundTimerUiEnabled`). */
+  protected readonly roundTimerUiEnabled = environment.roundTimerUiEnabled;
+
   readonly vm = input.required<PlanningRoomViewModel>();
   readonly voteSubmitBusy = input(false);
   readonly moderationBusy = input(false);

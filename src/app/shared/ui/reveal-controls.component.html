@@ -11,10 +11,20 @@
         Everyone has voted — you can reveal results.
       </p>
     }
+    <label class="mod-controls__auto">
+      <input
+        type="checkbox"
+        [checked]="autoRevealWhenAllVoted()"
+        [disabled]="busy()"
+        (change)="onAutoRevealChange($event)"
+      />
+      <span>Auto-reveal when everyone has voted</span>
+    </label>
     <div class="mod-controls__actions">
       <button
         type="button"
         uiBtn="primary"
+        uiBtnSize="sm"
         (click)="onReveal()"
         [disabled]="!canReveal() || busy()"
         [uiBtnLoading]="busy()"
@@ -25,6 +35,7 @@
       <button
         type="button"
         uiBtn="secondary"
+        uiBtnSize="sm"
         (click)="onReset()"
         [disabled]="!canResetRound() || busy()"
       >

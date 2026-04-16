@@ -20,4 +20,6 @@ export const environment = {
    * OAuth + issue fetch + sync-estimate are under this path (see `docs/JIRA_ARCHITECTURE.md`).
    */
   jiraBackendApiUrl: 'http://localhost:4000/api',
+  /** Round timer panel in the planning room (`app-room-circular-timer`). Default off. */
+  roundTimerUiEnabled: false,
 };

@@ -1,7 +1,7 @@
 import { Injectable, inject } from '@angular/core';
 import { serverTimestamp } from '@angular/fire/firestore';
 import { DEFAULT_ROUND_TIMER_DURATION_SEC, FinalEstimateMethod, VoteCard } from '@app/core/models';
-import { Observable, concatMap, of, switchMap, throwError } from 'rxjs';
+import { Observable, catchError, concatMap, of, switchMap, throwError } from 'rxjs';
 import { SESSION_REPOSITORY, STORY_REPOSITORY, VOTE_REPOSITORY } from '@app/core/tokens/repository.tokens';
 import { CreateSessionStoryParams } from '@app/data/repositories/story.repository';
 import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
@@ -17,7 +17,9 @@ export type SessionModerationFailure =
   | 'ROUND_NOT_REVEALED'
   | 'INVALID_JIRA_ISSUE_KEY'
   | 'INVALID_JIRA_SITE'
-  | 'INVALID_JIRA_BOARD_ID';
+  | 'INVALID_JIRA_BOARD_ID'
+  | 'TRANSFER_INVALID_MEMBER'
+  | 'TRANSFER_SAME_AS_CURRENT';
 
 @Injectable({ providedIn: 'root' })
 export class SessionModerationService {
@@ -97,7 +99,7 @@ export class SessionModerationService {
   createStory(
     sessionId: string,
     moderatorUid: string,
-    input: Pick<CreateSessionStoryParams, 'title' | 'description' | 'makeActive'>,
+    input: Pick<CreateSessionStoryParams, 'title' | 'description' | 'makeActive' | 'jiraIssueKey'>,
   ): Observable<string> {
     const sid = sessionId.trim();
     if (!sid) {
@@ -124,6 +126,7 @@ export class SessionModerationService {
           createdBy: moderatorUid,
           makeActive: input.makeActive,
           previousActiveStoryId: session.activeStoryId,
+          jiraIssueKey: input.jiraIssueKey ?? null,
         });
       }),
     );
@@ -418,6 +421,67 @@ export class SessionModerationService {
     );
   }
 
+  /**
+   * Hands moderator role to another session member. Updates session `moderatorId` and both members' `role`.
+   */
+  transferModerator(sessionId: string, moderatorUid: string, newModeratorUid: string): Observable<void> {
+    const sid = sessionId.trim();
+    const next = newModeratorUid.trim();
+    if (!sid || !next) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    if (next === moderatorUid) {
+      return throwError(() => this.err('TRANSFER_SAME_AS_CURRENT'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        return this.sessions.transferModerator(sid, moderatorUid, next).pipe(
+          catchError((err: unknown) => {
+            if (err instanceof Error && err.message === 'TRANSFER_INVALID_MEMBER') {
+              return throwError(() => this.err('TRANSFER_INVALID_MEMBER'));
+            }
+            return throwError(() => err);
+          }),
+        );
+      }),
+    );
+  }
+
+  /** Persists `settings.autoRevealWhenAllVoted` (moderator-only). */
+  setAutoRevealWhenAllVoted(
+    sessionId: string,
+    moderatorUid: string,
+    enabled: boolean,
+  ): Observable<void> {
+    const sid = sessionId.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        return this.sessions.patchBehaviorSettings(sid, { autoRevealWhenAllVoted: enabled });
+      }),
+    );
+  }
+
   switchActiveStory(sessionId: string, moderatorUid: string, storyId: string): Observable<void> {
     const sid = sessionId.trim();
     const nextId = storyId.trim();
@@ -467,11 +531,15 @@ export class SessionModerationService {
       case 'ROUND_NOT_REVEALED':
         return 'Reveal votes before choosing a final estimate.';
       case 'INVALID_JIRA_ISSUE_KEY':
-        return 'Enter a valid Jira issue key (for example PROJ-123).';
+        return 'Enter a valid Jira issue key (for example EVRST-1386).';
       case 'INVALID_JIRA_SITE':
         return 'Enter a valid Jira site URL (for example https://your-team.atlassian.net).';
       case 'INVALID_JIRA_BOARD_ID':
         return 'Board id must be numeric (open a board in Jira and read the id from the URL).';
+      case 'TRANSFER_INVALID_MEMBER':
+        return 'That participant is not in this session.';
+      case 'TRANSFER_SAME_AS_CURRENT':
+        return 'Pick a different participant to become moderator.';
       default:
         return 'Action could not be completed.';
     }

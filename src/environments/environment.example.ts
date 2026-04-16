@@ -18,4 +18,5 @@ export const environmentExample = {
   useEmulators: false,
   jiraIntegrationEnabled: true,
   jiraBackendApiUrl: '',
+  roundTimerUiEnabled: false,
 };

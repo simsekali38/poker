@@ -19,6 +19,6 @@ export interface Story {
   finalEstimateCard: VoteCard | null;
   /** Set when the estimate was successfully pushed to Jira (same round). */
   jiraSyncedAt: Date | null;
-  /** Target Jira issue (e.g. `PROJ-123`). Required before sending estimate to Jira. */
+  /** Target Jira issue (e.g. `EVRST-1386`). Required before sending estimate to Jira. */
   jiraIssueKey: string | null;
 }

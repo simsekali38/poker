@@ -4,6 +4,7 @@ export interface SessionSettings {
   deckPresetId: DeckPresetId;
   cards: readonly VoteCard[];
   allowVoteChangesBeforeReveal: boolean;
+  /** Default `true` when omitted; set `false` to require manual reveal. */
   autoRevealWhenAllVoted?: boolean;
   /** When `false`, Jira actions stay disabled in the UI even if `environment.jiraIntegrationEnabled` is true. */
   jiraIntegrationEnabled?: boolean;

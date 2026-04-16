@@ -1,22 +1,34 @@
 .planning-main {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-2);
   min-width: 0;
 }
 
 @media (min-width: 1024px) {
   .planning-main {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(260px, 300px);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(260px, 300px);
     grid-template-areas:
-      "story timer"
-      "progress timer"
-      "vote mod"
-      "results results";
+      "story story timer"
+      "progress progress timer"
+      "mod mod timer"
+      "vote vote vote"
+      "results results results";
     align-items: start;
     column-gap: var(--space-5);
-    row-gap: var(--space-4);
+    row-gap: var(--space-2);
+  }
+
+  /** When `environment.roundTimerUiEnabled` is false the timer column is omitted. */
+  .planning-main--no-timer {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "story"
+      "progress"
+      "mod"
+      "vote"
+      "results";
   }
 
   .planning-main__story {
@@ -27,6 +39,7 @@
     grid-area: timer;
     position: sticky;
     top: var(--space-4);
+    align-self: start;
   }
 
   .planning-main__progress {
@@ -46,9 +59,41 @@
   }
 }
 
+/** Full-width strip: label + vote tally (no tall empty panel beside moderator). */
+.planning-main__progress {
+  margin: 0;
+  min-width: 0;
+}
+
+.planning-main__progress-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.planning-main__progress-title {
+  margin: 0;
+  font: 600 0.8125rem/1.3 'Inter', system-ui, sans-serif;
+  color: var(--color-text);
+}
+
+.planning-main__progress-status {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
 .planning-main__moderate .ui-section-helper {
   margin-top: 0;
 }
+
+/** Tight subtitle under moderator panel title */
+.planning-main__mod-hint {
+  margin: 0 0 var(--space-2);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
 .vote-deck-card--selected {
   border-color: transparent;
   background: var(--color-primary);

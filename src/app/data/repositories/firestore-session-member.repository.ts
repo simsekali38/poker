@@ -3,13 +3,13 @@ import {
   DocumentData,
   Firestore,
   collection,
-  collectionData,
   doc,
   getDoc,
+  onSnapshot,
   serverTimestamp,
   setDoc,
 } from '@angular/fire/firestore';
-import { Observable, defer, from, map, of } from 'rxjs';
+import { Observable, defer, from, of } from 'rxjs';
 import { SessionMember, SessionMemberRole } from '@app/core/models';
 import { SESSIONS_COLLECTION } from '@app/data/firebase/firestore-paths';
 import { mapMemberDocument } from '@app/data/mappers/member-doc.mapper';
@@ -25,15 +25,27 @@ export class FirestoreSessionMemberRepository implements SessionMemberRepository
       return of([]);
     }
     const col = collection(this.firestore, SESSIONS_COLLECTION, id, 'members');
-    return collectionData(col, { idField: 'id' }).pipe(
-      map((rows) => {
-        const list = rows as Array<Record<string, unknown> & { id?: string }>;
-        return list
-          .map((r) => mapMemberDocument(id, String(r['id'] ?? ''), r as DocumentData))
-          .filter((m): m is SessionMember => m !== null)
-          .sort((a, b) => a.displayName.localeCompare(b.displayName, undefined, { sensitivity: 'base' }));
-      }),
-    );
+    // Use each snapshot doc's path id — not `collectionData` + `idField: 'id'`, which can
+    // mis-associate rows if a stored field named `id` collides with the document id.
+    return new Observable<SessionMember[]>((subscriber) => {
+      const unsubscribe = onSnapshot(
+        col,
+        (snap) => {
+          const members = snap.docs
+            .map((d) => mapMemberDocument(id, d.id, d.data() as DocumentData))
+            .filter((m): m is SessionMember => m !== null)
+            .sort((a, b) => {
+              const byName = a.displayName.localeCompare(b.displayName, undefined, {
+                sensitivity: 'base',
+              });
+              return byName !== 0 ? byName : a.id.localeCompare(b.id);
+            });
+          subscriber.next(members);
+        },
+        (err) => subscriber.error(err),
+      );
+      return () => unsubscribe();
+    });
   }
 
   upsertMemberOnJoin(params: UpsertMemberOnJoinParams): Observable<void> {

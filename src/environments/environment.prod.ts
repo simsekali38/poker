@@ -19,5 +19,6 @@ export const environment = {
    * Single-host `/api` only when the same server proxies to Node.
    */
   jiraBackendApiUrl: 'https://poker-api.aliasyazilim.com/api',
+  roundTimerUiEnabled: false,
 };
 

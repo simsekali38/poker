@@ -83,7 +83,8 @@ function mapSettings(raw: unknown): SessionSettings | null {
     deckPresetId,
     cards: cards as VoteCard[],
     allowVoteChangesBeforeReveal: Boolean(o['allowVoteChangesBeforeReveal']),
-    autoRevealWhenAllVoted: o['autoRevealWhenAllVoted'] === true,
+    /** Default on when field missing (legacy sessions). */
+    autoRevealWhenAllVoted: o['autoRevealWhenAllVoted'] !== false,
     ...(jira === true || jira === false ? { jiraIntegrationEnabled: jira } : {}),
     ...(typeof site === 'string' ? { jiraSiteUrl: site } : {}),
     ...(conn === true || conn === false ? { jiraConnected: conn } : {}),

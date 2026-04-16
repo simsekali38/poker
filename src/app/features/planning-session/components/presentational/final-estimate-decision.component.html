@@ -1,4 +1,9 @@
-<app-ui-panel title="Final estimate decision" [hover]="false" [labelledBy]="'final-estimate-h'">
+<app-ui-panel
+  title="Final estimate decision"
+  [compact]="true"
+  [hover]="false"
+  [labelledBy]="'final-estimate-h'"
+>
   @if (store.jiraSyncMessage(); as msg) {
     <p class="fed-flash" role="status">
       {{ msg }}
@@ -170,9 +175,9 @@
             #jiraIssue
             type="text"
             class="fed-jira-setup__input"
-            placeholder="PROJ-123"
+            placeholder="EVRST-1386"
             spellcheck="false"
-            autocomplete="off",
+            autocomplete="off"
             value="EVRST-"
           />
           <button

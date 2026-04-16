@@ -19,9 +19,12 @@ export class RevealControlsComponent {
   /** All participants have cast a vote; show emphasis before reveal. */
   readonly votesReadyToReveal = input(false);
   readonly busy = input(false);
+  /** Persisted on session; moderator’s client triggers reveal when all online members voted. */
+  readonly autoRevealWhenAllVoted = input(false);
 
   readonly reveal = output<void>();
   readonly resetRound = output<void>();
+  readonly autoRevealWhenAllVotedChange = output<boolean>();
 
   protected onReveal(): void {
     if (this.canReveal() && !this.busy()) {
@@ -35,4 +38,8 @@ export class RevealControlsComponent {
     }
   }
 
+  protected onAutoRevealChange(ev: Event): void {
+    const el = ev.target as HTMLInputElement;
+    this.autoRevealWhenAllVotedChange.emit(el.checked);
+  }
 }

@@ -76,4 +76,9 @@ export interface PlanningRoomViewModel {
   /** From session.settings — Jira Cloud site and optional Scrum board. */
   jiraSiteUrl: string | null;
   jiraBoardId: string | null;
+  /** True when moderators can load a story from Jira by issue key (env + session + site URL). */
+  jiraStoryImportAvailable: boolean;
+
+  /** When true, moderator client auto-reveals once all online members have voted. */
+  autoRevealWhenAllVoted: boolean;
 }
