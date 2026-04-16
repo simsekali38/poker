@@ -89,8 +89,8 @@ export class SessionCreatePageComponent implements OnInit {
     deckPresetId: this.fb.control<DeckPresetId>('fibonacci', {
       validators: [Validators.required, this.deckPresetValidator],
     }),
-    jiraSiteUrl: this.fb.control('', { validators: [this.optionalJiraSiteValidator] }),
-    initialJiraIssueKey: this.fb.control('', { validators: [this.optionalJiraIssueValidator] }),
+    jiraSiteUrl: this.fb.control('https://migrosone.atlassian.net/', { validators: [this.optionalJiraSiteValidator] }),
+    initialJiraIssueKey: this.fb.control('EVRST-', { validators: [this.optionalJiraIssueValidator] }),
     jiraOAuthCompleted: this.fb.control(false),
   });
 
@@ -134,7 +134,8 @@ export class SessionCreatePageComponent implements OnInit {
         const sessionRaw = summary ? `${issue.issueKey}: ${summary}` : issue.issueKey;
         const sessionTitle = sessionRaw.slice(0, 120);
         this.form.patchValue(
-          { initialStoryTitle: storyTitle, sessionTitle: sessionTitle },
+          { initialStoryTitle: storyTitle, },
+          //{ initialStoryTitle: storyTitle, sessionTitle: sessionTitle },
           { emitEvent: false },
         );
       });

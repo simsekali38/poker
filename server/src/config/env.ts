@@ -14,7 +14,11 @@ const schema = z.object({
   ATLASSIAN_CLIENT_ID: z.string().min(1),
   ATLASSIAN_CLIENT_SECRET: z.string().min(1),
   ATLASSIAN_OAUTH_REDIRECT_URI: z.string().url(),
-  ATLASSIAN_SCOPES: z.string().default('read:jira-work write:jira-work offline_access read:me'),
+  ATLASSIAN_SCOPES: z
+    .string()
+    .default(
+      'offline_access read:me read:jira-work write:jira-work read:issue-details:jira write:issue:jira-software read:sprint:jira-software read:board-scope:jira-software write:sprint:jira-software'
+    ),
 
   TOKEN_ENCRYPTION_KEY: z.string().min(1),
 

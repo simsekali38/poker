@@ -172,7 +172,8 @@
             class="fed-jira-setup__input"
             placeholder="PROJ-123"
             spellcheck="false"
-            autocomplete="off"
+            autocomplete="off",
+            value="EVRST-"
           />
           <button
             type="button"
@@ -181,7 +182,7 @@
             [disabled]="store.jiraMetaBusy()"
             (click)="store.saveActiveStoryJiraIssueKey(jiraIssue.value)"
           >
-            Save issue
+            Change issue
           </button>
         </div>
         @if (decision().story.jiraIssueKey; as ik) {
@@ -213,7 +214,7 @@
               [disabled]="store.jiraMetaBusy()"
               (click)="store.saveSessionJiraBoardId(jiraBoard.value)"
             >
-              Save board
+              Change board
             </button>
           </div>
           @if (decision().jiraBoardId; as bid) {

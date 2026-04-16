@@ -19,5 +19,5 @@ export const environment = {
    * Node API base (`/api` included), e.g. `http://localhost:4000/api`.
    * OAuth + issue fetch + sync-estimate are under this path (see `docs/JIRA_ARCHITECTURE.md`).
    */
-  jiraBackendApiUrl: 'https://poker-api.aliasyazilim.com/api',
+  jiraBackendApiUrl: 'http://localhost:4000/api',
 };
