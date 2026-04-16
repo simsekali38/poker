@@ -199,6 +199,60 @@ public sealed class JiraController : ControllerBase
         }
     }
 
+    /// <summary>Lists Jira Software boards for a project (from issue key project, e.g. EVRST).</summary>
+    [HttpGet("boards")]
+    [ServiceFilter(typeof(FirebaseAuthFilter))]
+    public async Task<IActionResult> GetBoards([FromQuery] string? siteUrl, [FromQuery] string? projectKey, CancellationToken ct)
+    {
+        siteUrl = siteUrl?.Trim() ?? "";
+        projectKey = projectKey?.Trim() ?? "";
+        if (string.IsNullOrEmpty(siteUrl) || string.IsNullOrEmpty(projectKey))
+        {
+            return BadRequest(new { error = "siteUrl and projectKey query params are required" });
+        }
+
+        var uid = HttpContext.RequireUid();
+        try
+        {
+            var boards = await _jira.ListBoardsForProjectAsync(uid, siteUrl, projectKey, ct);
+            return Ok(new
+            {
+                boards = boards.Select(b => new { id = b.Id, name = b.Name, type = b.Type }),
+            });
+        }
+        catch (Exception e)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = e.Message });
+        }
+    }
+
+    [HttpGet("board-sprints")]
+    [ServiceFilter(typeof(FirebaseAuthFilter))]
+    public async Task<IActionResult> GetBoardSprints([FromQuery] string? siteUrl, [FromQuery] string? boardId, CancellationToken ct)
+    {
+        siteUrl = siteUrl?.Trim() ?? "";
+        boardId = boardId?.Trim() ?? "";
+        if (string.IsNullOrEmpty(siteUrl) || string.IsNullOrEmpty(boardId))
+        {
+            return BadRequest(new { error = "siteUrl and boardId query params are required" });
+        }
+
+        var uid = HttpContext.RequireUid();
+        try
+        {
+            var (board, sprints) = await _jira.GetBoardSprintsBundleAsync(uid, siteUrl, boardId, ct);
+            return Ok(new
+            {
+                board = new { id = board.Id, name = board.Name },
+                sprints = sprints.Select(s => new { id = s.Id, name = s.Name, state = s.State, originBoardId = s.OriginBoardId }),
+            });
+        }
+        catch (Exception e)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new { error = e.Message });
+        }
+    }
+
     public sealed record SyncEstimateDto(
         string SessionId,
         string StoryId,
@@ -206,6 +260,7 @@ public sealed class JiraController : ControllerBase
         string JiraIssueKey,
         string? JiraSiteUrl,
         string? JiraBoardId,
+        int? SprintId,
         string Estimate,
         string Method,
         bool? IncludeComment,
@@ -232,6 +287,7 @@ public sealed class JiraController : ControllerBase
             body.JiraIssueKey,
             body.JiraSiteUrl,
             body.JiraBoardId,
+            body.SprintId,
             body.Estimate,
             body.Method,
             body.IncludeComment,

@@ -69,6 +69,7 @@ Rules are **not** shipped in this repo. Before production, deploy rules that enf
 
 ## Project layout
 
+- `server-dotnet/PokerPlanning.Api` — **Jira integration API** (OAuth, issue preview, sync estimate, sprints). Run with `dotnet run`; see `server-dotnet/README.md` and `docs/JIRA_ARCHITECTURE.md`. Angular `jiraBackendApiUrl` must point at this host’s `/api` base.
 - `src/app/core` — Guards, models, services, tokens, utilities
 - `src/app/shared` — UI widgets, pipes, directives, utils
 - `src/app/features` — `home`, `session-create`, `session-join`, `planning-session`

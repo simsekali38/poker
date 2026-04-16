@@ -13,3 +13,20 @@ export function parseJiraIssueKey(raw: string | null | undefined): string | null
   }
   return s;
 }
+
+/** Project key from a valid issue key, e.g. `EVRST-1386` → `EVRST`. */
+export function parseJiraProjectKeyFromIssue(raw: string | null | undefined): string | null {
+  const k = parseJiraIssueKey(raw);
+  if (!k) {
+    return null;
+  }
+  const lastHyphen = k.lastIndexOf('-');
+  if (lastHyphen <= 0) {
+    return null;
+  }
+  const suffix = k.slice(lastHyphen + 1);
+  if (!/^\d+$/.test(suffix)) {
+    return null;
+  }
+  return k.slice(0, lastHyphen);
+}

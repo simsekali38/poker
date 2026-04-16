@@ -196,37 +196,157 @@
       </div>
       @if (decision().jiraSessionReady) {
         <div class="fed-jira-setup__board">
-          <label class="fed-jira-setup__label" for="fed-jira-board">Scrum board id (optional)</label>
-          <p class="fed-jira-setup__hint">
-            From a Jira board URL: <code>…/jira/software/projects/X/boards/<strong>123</strong></code> — used for Agile
-            estimation when set.
-          </p>
-          <div class="fed-jira-setup__row">
-            <input
-              id="fed-jira-board"
-              #jiraBoard
-              type="text"
-              class="fed-jira-setup__input"
-              inputmode="numeric"
-              pattern="[0-9]*"
-              placeholder="e.g. 123"
-              autocomplete="off"
-            />
-            <button
-              type="button"
-              uiBtn="secondary"
-              uiBtnSize="sm"
-              [disabled]="store.jiraMetaBusy()"
-              (click)="store.saveSessionJiraBoardId(jiraBoard.value)"
-            >
-              Change board
+          <label class="fed-jira-setup__label" for="fed-jira-board-select">Board (Agile)</label>
+          @if (!decision().story.jiraIssueKey) {
+            <p class="fed-jira-setup__hint">Link an issue key above — boards are loaded from that issue’s project.</p>
+          } @else if (boardsDiscoveryLoading()) {
+            <p class="fed-jira-setup__status" role="status">
+              Loading boards for project <strong>{{ issueProjectKey() }}</strong>…
+            </p>
+          } @else if (boardsDiscoveryError()) {
+            <p class="fed-jira-setup__err" role="alert">{{ boardsDiscoveryError() }}</p>
+            <button type="button" uiBtn="secondary" uiBtnSize="sm" (click)="refreshJiraBoardDiscovery()">
+              Retry
             </button>
-          </div>
+          } @else if (jiraProjectBoards().length === 0) {
+            <p class="fed-jira-setup__hint">
+              No boards returned for this project. Confirm Jira Software / OAuth scopes, or set the board id manually
+              below.
+            </p>
+            <button type="button" class="fed-jira-setup__linkish" (click)="refreshJiraBoardDiscovery()">
+              Refresh boards
+            </button>
+          } @else if (jiraProjectBoards().length === 1) {
+            <p class="fed-jira-setup__saved">
+              Using board <strong>{{ jiraProjectBoards()[0].name }}</strong>
+              <span class="fed-jira-setup__muted">
+                — id {{ jiraProjectBoards()[0].id }}, {{ jiraProjectBoards()[0].type }}</span
+              >
+              @if (singleBoardMatchesSession()) {
+                <span class="fed-jira-setup__muted"> (saved)</span>
+              }
+            </p>
+            <button type="button" class="fed-jira-setup__linkish" (click)="refreshJiraBoardDiscovery()">
+              Refresh boards
+            </button>
+          } @else {
+            <p class="fed-jira-setup__hint">Several boards exist for this project — pick one.</p>
+            <div class="fed-jira-setup__row">
+              <select
+                id="fed-jira-board-select"
+                class="fed-jira-setup__input fed-jira-setup__select"
+                [disabled]="store.jiraMetaBusy()"
+                [value]="selectedBoardSelectValue()"
+                (change)="onJiraBoardSelectFromList($event)"
+              >
+                <option value="" disabled>Choose a board…</option>
+                @for (b of jiraProjectBoards(); track b.id) {
+                  <option [value]="b.id">{{ b.name }} ({{ b.type }})</option>
+                }
+              </select>
+              <button type="button" uiBtn="secondary" uiBtnSize="sm" (click)="refreshJiraBoardDiscovery()">
+                Refresh
+              </button>
+            </div>
+          }
+          <details class="fed-jira-setup__manual">
+            <summary>Manuel board id</summary>
+            <p class="fed-jira-setup__hint">
+              From a Jira board URL: <code>…/jira/software/projects/X/boards/<strong>123</strong></code>
+            </p>
+            <div class="fed-jira-setup__row">
+              <input
+                #jiraBoardManual
+                type="text"
+                class="fed-jira-setup__input"
+                inputmode="numeric"
+                pattern="[0-9]*"
+                placeholder="e.g. 123"
+                autocomplete="off"
+              />
+              <button
+                type="button"
+                uiBtn="secondary"
+                uiBtnSize="sm"
+                [disabled]="store.jiraMetaBusy()"
+                (click)="store.saveSessionJiraBoardId(jiraBoardManual.value)"
+              >
+                Save id
+              </button>
+            </div>
+          </details>
           @if (decision().jiraBoardId; as bid) {
-            <p class="fed-jira-setup__saved">Saved board id: <strong>{{ bid }}</strong></p>
+            <p class="fed-jira-setup__saved">Session board id: <strong>{{ bid }}</strong></p>
           }
         </div>
       }
+    </div>
+  }
+
+  @if (
+    decision().jiraIntegrationAvailable &&
+    decision().jiraSessionReady &&
+    decision().jiraBoardId &&
+    !decision().story.jiraSyncedAt
+  ) {
+    <div class="fed-sprint">
+      <h3 class="fed-sprint__title">Sprint</h3>
+      <p class="fed-sprint__desc">
+        After story points are written, the issue can be moved to a sprint on this board.
+        @if (boardDisplayName(); as bn) {
+          <span class="fed-sprint__board">{{ bn }}</span>
+        }
+      </p>
+      <label class="fed-sprint__filter">
+        <input
+          type="checkbox"
+          [checked]="sprintFilterThisBoardOnly()"
+          (change)="toggleSprintBoardFilter()"
+        />
+        Only show sprints on this board
+      </label>
+      @if (sprintsLoading()) {
+        <p class="fed-sprint__status" role="status">Loading sprints…</p>
+      }
+      @if (sprintsError(); as err) {
+        <p class="fed-sprint__err" role="alert">{{ err }}</p>
+      }
+      <div class="fed-sprint__row">
+        <label class="fed-sprint__label" for="fed-jira-sprint">Target sprint</label>
+        <div class="fed-sprint__select-wrap">
+          <select
+            id="fed-jira-sprint"
+            class="fed-sprint__select"
+            [disabled]="sprintsLoading()"
+            [value]="selectedSprintSelectValue()"
+            (change)="onJiraSprintSelect($event)"
+          >
+            <option value="">Story points only — do not change sprint</option>
+            @if (sprintsActive().length > 0) {
+              <optgroup label="Active">
+                @for (s of sprintsActive(); track s.id) {
+                  <option [value]="s.id">{{ s.name }}</option>
+                }
+              </optgroup>
+            }
+            @if (sprintsFuture().length > 0) {
+              <optgroup label="Future">
+                @for (s of sprintsFuture(); track s.id) {
+                  <option [value]="s.id">{{ s.name }}</option>
+                }
+              </optgroup>
+            }
+          </select>
+          <button
+            type="button"
+            class="fed-sprint__refresh"
+            [disabled]="sprintsLoading() || !decision().jiraSiteUrl || !decision().jiraBoardId"
+            (click)="loadBoardSprints(decision().jiraSiteUrl!, decision().jiraBoardId!)"
+          >
+            Refresh
+          </button>
+        </div>
+      </div>
     </div>
   }
 

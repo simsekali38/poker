@@ -1,4 +1,4 @@
-import { HttpClient, HttpHeaders } from '@angular/common/http';
+import { HttpClient, HttpHeaders, HttpParams } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Auth } from '@angular/fire/auth';
 import { VoteCard } from '@app/core/models';
@@ -25,6 +25,8 @@ export interface SendFinalEstimatePayload {
   readonly jiraIssueKey: string;
   readonly jiraSiteUrl: string | null;
   readonly jiraBoardId?: string | null;
+  /** When set, issue is moved to this Jira Software sprint after story points are written. */
+  readonly sprintId?: number | null;
   readonly includeComment?: boolean;
   readonly votes: readonly JiraSyncVoteLine[];
   readonly participants: readonly JiraSyncParticipantLine[];
@@ -33,6 +35,28 @@ export interface SendFinalEstimatePayload {
 export interface SyncEstimateResponse {
   ok: boolean;
   firestoreUpdated?: boolean;
+}
+
+export interface JiraBoardSprintRow {
+  readonly id: number;
+  readonly name: string;
+  readonly state: string;
+  readonly originBoardId?: number;
+}
+
+export interface JiraBoardSprintsResponse {
+  readonly board: { readonly id: number; readonly name: string };
+  readonly sprints: readonly JiraBoardSprintRow[];
+}
+
+export interface JiraBoardListRow {
+  readonly id: number;
+  readonly name: string;
+  readonly type: string;
+}
+
+export interface JiraBoardsForProjectResponse {
+  readonly boards: readonly JiraBoardListRow[];
 }
 
 /**
@@ -54,10 +78,50 @@ export class JiraPlanningIntegrationService {
           return throwError(() => new Error('Sign in required'));
         }
         const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
-        console.log(payload);
-
         return this.http.post<SyncEstimateResponse>(`${base}/jira/sync-estimate`, payload, {
           headers,
+        });
+      }),
+    );
+  }
+
+  /** GET /jira/boards — boards for a project key (derived from issue key). */
+  listBoardsForProject(jiraSiteUrl: string, projectKey: string): Observable<JiraBoardsForProjectResponse> {
+    const base = environment.jiraBackendApiUrl?.replace(/\/$/, '') ?? '';
+    if (!environment.jiraIntegrationEnabled || !base) {
+      return throwError(() => new Error('Jira integration is not configured'));
+    }
+    const params = new HttpParams().set('siteUrl', jiraSiteUrl).set('projectKey', projectKey);
+    return from(this.auth.currentUser?.getIdToken() ?? Promise.resolve(null)).pipe(
+      switchMap((token) => {
+        if (!token) {
+          return throwError(() => new Error('Sign in required'));
+        }
+        const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+        return this.http.get<JiraBoardsForProjectResponse>(`${base}/jira/boards`, {
+          headers,
+          params,
+        });
+      }),
+    );
+  }
+
+  /** GET /jira/board-sprints — requires session Scrum board id and linked Jira site. */
+  listBoardSprints(jiraSiteUrl: string, boardId: string): Observable<JiraBoardSprintsResponse> {
+    const base = environment.jiraBackendApiUrl?.replace(/\/$/, '') ?? '';
+    if (!environment.jiraIntegrationEnabled || !base) {
+      return throwError(() => new Error('Jira integration is not configured'));
+    }
+    const params = new HttpParams().set('siteUrl', jiraSiteUrl).set('boardId', boardId);
+    return from(this.auth.currentUser?.getIdToken() ?? Promise.resolve(null)).pipe(
+      switchMap((token) => {
+        if (!token) {
+          return throwError(() => new Error('Sign in required'));
+        }
+        const headers = new HttpHeaders({ Authorization: `Bearer ${token}` });
+        return this.http.get<JiraBoardSprintsResponse>(`${base}/jira/board-sprints`, {
+          headers,
+          params,
         });
       }),
     );

@@ -1,6 +1,6 @@
 # Jira Cloud integration — architecture
 
-This document describes how the Angular planning poker app, the Node.js API, Jira Cloud (OAuth 2.0 3LO), and Firestore fit together.
+This document describes how the Angular planning poker app, the **ASP.NET Core** Jira API (`server-dotnet/PokerPlanning.Api`), Jira Cloud (OAuth 2.0 3LO), and Firestore fit together.
 
 ## High-level diagram
 
@@ -10,7 +10,7 @@ flowchart LR
     UI[Planning session UI]
     FS[Firestore client SDK]
   end
-  subgraph api [Node API]
+  subgraph api [ASP.NET Core API]
     OAuth[Jira OAuth 3LO]
     Jira[Jira REST client]
     Admin[Firebase Admin optional]
@@ -44,7 +44,7 @@ flowchart LR
 
 - **Verify caller identity**: All Jira endpoints require `Authorization: Bearer <Firebase ID token>` (verified with Firebase Admin).
 - **OAuth 2.0 (3LO)**: Start URL generation, callback handling, authorization code exchange, secure token storage, refresh before Jira calls.
-- **Token storage**: Encrypt Atlassian access/refresh tokens at rest (AES-256-GCM); persist in SQLite (dev) or Postgres (prod) via Prisma.
+- **Token storage**: Encrypt Atlassian access/refresh tokens at rest (AES-256-GCM); persist in SQLite (or PostgreSQL when configured) via Entity Framework.
 - **Jira API**: Resolve `cloudId` from `siteUrl` using `GET /oauth/token/accessible-resources`, then call `ex/jira/{cloudId}/rest/api/3/...`.
 - **Estimation**: Prefer board-based estimation when `jiraBoardId` or `JIRA_DEFAULT_BOARD_ID` is set; otherwise update the configured Story Points custom field (`JIRA_STORY_POINTS_FIELD_ID`).
 - **Audit**: Append structured audit entries to an issue property (`planningPokerAudit`) and optionally add a human-readable Jira comment with session id, participants, votes, final estimate, timestamp.
@@ -54,7 +54,7 @@ flowchart LR
 
 1. User signs in with Firebase (including anonymous).
 2. User clicks **Connect Jira**. SPA obtains a Firebase **ID token** and calls `POST /api/jira/oauth/start` with `{ returnUrl }`.
-3. API verifies the ID token, creates a short-lived **state** record (in-memory; use Redis in multi-instance production), and returns `{ redirectUrl }` pointing to `https://auth.atlassian.com/authorize` with `audience=api.atlassian.com`, `client_id`, `redirect_uri`, `response_type=code`, `prompt=consent`, `scope` (see `.env.example`), and `state`.
+3. API verifies the ID token, creates a short-lived **state** record (in-memory; use Redis in multi-instance production), and returns `{ redirectUrl }` pointing to `https://auth.atlassian.com/authorize` with `audience=api.atlassian.com`, `client_id`, `redirect_uri`, `response_type=code`, `prompt=consent`, `scope` (from `Atlassian:Scopes`; must include Jira Software granular scopes for Agile — e.g. `read:board-scope:jira-software` and `read:project:jira` for board list — see `server-dotnet/README.md`), and `state`.
 4. Browser navigates to `redirectUrl`. User approves at Atlassian.
 5. Atlassian redirects to `GET /api/jira/oauth/callback?code=...&state=...`.
 6. API validates `state`, exchanges `code` for access/refresh tokens, stores encrypted tokens keyed by **Firebase UID**, resolves a default `jira_site` from accessible resources, redirects to `returnUrl?jira_connected=1&jira_site=<encoded site URL>`.
@@ -92,9 +92,9 @@ An example rules file ships at the repo root: `firestore.rules`, referenced from
 
 Review and tighten `create`/`update` conditions for your deployment (field lists, session status). Moderators need write access to `settings.*` (including `jiraBoardId`) and stories; members need `votes` writes only for `memberId == request.auth.uid` after they have joined.
 
-## API contract (Angular ↔ Node)
+## API contract (Angular ↔ backend)
 
-Base URL: `environment.jiraBackendApiUrl` (e.g. `http://localhost:4000/api`).
+Base URL: `environment.jiraBackendApiUrl` (e.g. `http://localhost:4000/api` when running `dotnet run` for `PokerPlanning.Api`).
 
 All authenticated routes:
 
@@ -119,6 +119,33 @@ Authorization: Bearer <Firebase ID token>
 ### `GET /jira/oauth/callback` (browser redirect)
 
 Handled by Atlassian → API → user agent. Not called from Angular directly.
+
+### `GET /jira/boards?siteUrl=…&projectKey=…`
+
+Lists **Jira Software boards** for a project (`projectKey` = issue prefix, e.g. `EVRST` from `EVRST-1386`). Used to pick `jiraBoardId` without manual entry.
+
+**Response `200`**
+
+```json
+{
+  "boards": [{ "id": 123, "name": "EVRST board", "type": "scrum" }]
+}
+```
+
+### `GET /jira/board-sprints?siteUrl=…&boardId=…`
+
+Lists **future** and **active** sprints for the Scrum/Kanban board (Jira Agile API). Used by the final-estimate UI before **Send to Jira**.
+
+**Response `200`**
+
+```json
+{
+  "board": { "id": 1, "name": "EVRST board" },
+  "sprints": [
+    { "id": 42, "name": "Sprint 15", "state": "future", "originBoardId": 1 }
+  ]
+}
+```
 
 ### `GET /jira/issues/:issueKey?siteUrl=https%3A%2F%2F...`
 
@@ -147,6 +174,7 @@ Handled by Atlassian → API → user agent. Not called from Angular directly.
   "jiraIssueKey": "PROJ-1",
   "jiraSiteUrl": "https://team.atlassian.net",
   "jiraBoardId": "123",
+  "sprintId": 42,
   "estimate": "5",
   "method": "consensus",
   "includeComment": false,
@@ -171,9 +199,10 @@ Errors: `400` validation, `401` auth, `403` Jira permission, `502` Jira/Atlassia
 
 1. **Story Points (Details panel)**: Map `estimate` to a number, then `PUT /rest/api/3/issue/{issueId}` with `fields[JIRA_STORY_POINTS_FIELD_ID]` set to that **number** (this is the field shown under Issue → Details → Story Points).
 2. **Board estimation** (optional): Only if `JIRA_USE_BOARD_ESTIMATION=true` and a board id is set — `PUT /rest/agile/1.0/issue/{issueId}/estimation?boardId=…` after the Story Points field update.
-3. **Issue property audit** (optional): Only if `JIRA_INCLUDE_AUDIT_PROPERTY=true`.
-4. **Comment** (optional): Only if the client sends `includeComment: true` (default in the app is `false`).
-5. **Firestore**: `jiraSyncedAt` on the story after success (client and/or Admin).
+3. **Sprint** (optional): If `sprintId` is present — `POST /rest/agile/1.0/sprint/{sprintId}/issue` with `issues: [issueKey]` to move the issue onto that sprint.
+4. **Issue property audit** (optional): Only if `JIRA_INCLUDE_AUDIT_PROPERTY=true`.
+5. **Comment** (optional): Only if the client sends `includeComment: true` (default in the app is `false`).
+6. **Firestore**: `jiraSyncedAt` on the story after success (client and/or Admin).
 
 ## Security notes
 

@@ -15,6 +15,7 @@ public sealed record SyncEstimateInput(
     string JiraIssueKey,
     string JiraSiteUrl,
     string? JiraBoardId,
+    int? SprintId,
     string Estimate,
     string Method,
     bool? IncludeComment,
@@ -70,6 +71,16 @@ public sealed class SyncEstimateService
                     Console.WriteLine("Optional board estimation failed: " + ex.Message);
                 }
             }
+        }
+
+        if (input.SprintId is int sid && sid > 0)
+        {
+            await _jira.AddIssuesToSprintAsync(
+                firebaseUid,
+                cloudId,
+                sid,
+                new[] { input.JiraIssueKey },
+                ct);
         }
 
         if (_config["JiraIncludeAuditProperty"] == "true")

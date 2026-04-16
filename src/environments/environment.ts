@@ -16,8 +16,8 @@ export const environment = {
   /** When false, “Send to Jira” stays disabled and no HTTP calls are made. */
   jiraIntegrationEnabled: true,
   /**
-   * Node API base (`/api` included), e.g. `http://localhost:4000/api`.
-   * OAuth + issue fetch + sync-estimate are under this path (see `docs/JIRA_ARCHITECTURE.md`).
+   * ASP.NET Core Jira API base (`/api` included), e.g. `http://localhost:4000/api` (`dotnet run` in `server-dotnet/PokerPlanning.Api`).
+   * OAuth, issue fetch, sync-estimate, board-sprints — see `docs/JIRA_ARCHITECTURE.md` and `server-dotnet/README.md`.
    */
   jiraBackendApiUrl: 'http://localhost:4000/api',
   /** Round timer panel in the planning room (`app-room-circular-timer`). Default off. */

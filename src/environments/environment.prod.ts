@@ -14,9 +14,8 @@ export const environment = {
   useEmulators: false,
   jiraIntegrationEnabled: true,
   /**
-   * Jira API base (must include `/api`). FTP-only static hosting cannot run Node — deploy API on
-   * another host (e.g. `https://poker-api.example.com/api`) and set `CORS_ORIGIN` to this SPA origin.
-   * Single-host `/api` only when the same server proxies to Node.
+   * Jira API base (must include `/api`). Deploy `server-dotnet/PokerPlanning.Api` (IIS/Kestrel) and point
+   * `CorsOrigin` to this SPA origin. Example: `https://poker-api.example.com/api`.
    */
   jiraBackendApiUrl: 'https://poker-api.aliasyazilim.com/api',
   roundTimerUiEnabled: false,

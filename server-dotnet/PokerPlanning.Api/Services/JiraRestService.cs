@@ -278,4 +278,200 @@ public sealed class JiraRestService
         }
     }
 
+    public async Task<(JiraAgileBoardDto Board, IReadOnlyList<JiraSprintRow> Sprints)> GetBoardSprintsBundleAsync(
+        string firebaseUid,
+        string siteUrl,
+        string boardId,
+        CancellationToken ct = default)
+    {
+        var access = await _tokens.GetValidAccessTokenAsync(firebaseUid, ct);
+        var http = _httpFactory.CreateClient();
+        var resources = await JiraSiteService.FetchAccessibleResourcesAsync(http, access, ct);
+        var cloudId = JiraSiteService.ResolveCloudId(resources, siteUrl);
+        var board = await FetchAgileBoardAsync(http, access, cloudId, boardId, ct);
+        var sprints = await ListBoardSprintsOpenAsync(http, access, cloudId, boardId, ct);
+        return (board, sprints);
+    }
+
+    /// <summary>Lists Agile boards for a Jira project (by project key, e.g. EVRST).</summary>
+    public async Task<IReadOnlyList<JiraBoardBriefDto>> ListBoardsForProjectAsync(
+        string firebaseUid,
+        string siteUrl,
+        string projectKey,
+        CancellationToken ct = default)
+    {
+        var access = await _tokens.GetValidAccessTokenAsync(firebaseUid, ct);
+        var http = _httpFactory.CreateClient();
+        var resources = await JiraSiteService.FetchAccessibleResourcesAsync(http, access, ct);
+        var cloudId = JiraSiteService.ResolveCloudId(resources, siteUrl);
+        return await ListBoardsForProjectCoreAsync(http, access, cloudId, projectKey, ct);
+    }
+
+    public async Task AddIssuesToSprintAsync(
+        string firebaseUid,
+        string cloudId,
+        int sprintId,
+        IReadOnlyList<string> issueKeys,
+        CancellationToken ct = default)
+    {
+        var access = await _tokens.GetValidAccessTokenAsync(firebaseUid, ct);
+        var http = _httpFactory.CreateClient();
+        var url =
+            $"https://api.atlassian.com/ex/jira/{cloudId}/rest/agile/1.0/sprint/{sprintId}/issue";
+        var body = JsonSerializer.Serialize(new { issues = issueKeys });
+        using var req = new HttpRequestMessage(HttpMethod.Post, url);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", access);
+        req.Content = new StringContent(body, Encoding.UTF8, "application/json");
+        var res = await http.SendAsync(req, ct);
+        if (!res.IsSuccessStatusCode && res.StatusCode != System.Net.HttpStatusCode.NoContent)
+        {
+            var t = await res.Content.ReadAsStringAsync(ct);
+            throw new InvalidOperationException($"Jira add to sprint failed: {(int)res.StatusCode} {t}");
+        }
+    }
+
+    private static async Task<JiraAgileBoardDto> FetchAgileBoardAsync(
+        HttpClient http,
+        string accessToken,
+        string cloudId,
+        string boardId,
+        CancellationToken ct)
+    {
+        var url =
+            $"https://api.atlassian.com/ex/jira/{cloudId}/rest/agile/1.0/board/{Uri.EscapeDataString(boardId)}";
+        using var req = new HttpRequestMessage(HttpMethod.Get, url);
+        req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+        req.Headers.Accept.ParseAdd("application/json");
+        var res = await http.SendAsync(req, ct);
+        var text = await res.Content.ReadAsStringAsync(ct);
+        if (!res.IsSuccessStatusCode)
+        {
+            throw new InvalidOperationException($"Jira board fetch failed: {(int)res.StatusCode} {text}");
+        }
+
+        using var doc = JsonDocument.Parse(text);
+        var root = doc.RootElement;
+        var id = root.GetProperty("id").GetInt32();
+        var name = root.TryGetProperty("name", out var n) ? n.GetString() ?? "" : "";
+        return new JiraAgileBoardDto(id, name);
+    }
+
+    private static async Task<IReadOnlyList<JiraSprintRow>> ListBoardSprintsOpenAsync(
+        HttpClient http,
+        string accessToken,
+        string cloudId,
+        string boardId,
+        CancellationToken ct)
+    {
+        var list = new List<JiraSprintRow>();
+        var startAt = 0;
+        const int maxResults = 50;
+        for (;;)
+        {
+            var url =
+                $"https://api.atlassian.com/ex/jira/{cloudId}/rest/agile/1.0/board/{Uri.EscapeDataString(boardId)}/sprint" +
+                $"?startAt={startAt}&maxResults={maxResults}&state=future,active";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            req.Headers.Accept.ParseAdd("application/json");
+            var res = await http.SendAsync(req, ct);
+            var text = await res.Content.ReadAsStringAsync(ct);
+            if (!res.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"Jira sprints list failed: {(int)res.StatusCode} {text}");
+            }
+
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            var isLast = root.TryGetProperty("isLast", out var il) && il.GetBoolean();
+            if (!root.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Array)
+            {
+                break;
+            }
+
+            foreach (var v in values.EnumerateArray())
+            {
+                var sid = v.GetProperty("id").GetInt32();
+                var sname = v.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "";
+                var state = v.TryGetProperty("state", out var st) ? st.GetString() ?? "" : "";
+                int? origin = null;
+                if (v.TryGetProperty("originBoardId", out var ob) && ob.ValueKind == JsonValueKind.Number)
+                {
+                    origin = ob.GetInt32();
+                }
+
+                list.Add(new JiraSprintRow(sid, sname, state, origin));
+            }
+
+            var chunkLen = values.GetArrayLength();
+            if (isLast || chunkLen == 0)
+            {
+                break;
+            }
+
+            startAt += chunkLen;
+        }
+
+        return list;
+    }
+
+    private static async Task<IReadOnlyList<JiraBoardBriefDto>> ListBoardsForProjectCoreAsync(
+        HttpClient http,
+        string accessToken,
+        string cloudId,
+        string projectKey,
+        CancellationToken ct)
+    {
+        var list = new List<JiraBoardBriefDto>();
+        var startAt = 0;
+        const int maxResults = 50;
+        var encoded = Uri.EscapeDataString(projectKey);
+        for (;;)
+        {
+            var url =
+                $"https://api.atlassian.com/ex/jira/{cloudId}/rest/agile/1.0/board" +
+                $"?projectKeyOrId={encoded}&startAt={startAt}&maxResults={maxResults}";
+            using var req = new HttpRequestMessage(HttpMethod.Get, url);
+            req.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", accessToken);
+            req.Headers.Accept.ParseAdd("application/json");
+            var res = await http.SendAsync(req, ct);
+            var text = await res.Content.ReadAsStringAsync(ct);
+            if (!res.IsSuccessStatusCode)
+            {
+                throw new InvalidOperationException($"Jira boards list failed: {(int)res.StatusCode} {text}");
+            }
+
+            using var doc = JsonDocument.Parse(text);
+            var root = doc.RootElement;
+            var isLast = root.TryGetProperty("isLast", out var il) && il.GetBoolean();
+            if (!root.TryGetProperty("values", out var values) || values.ValueKind != JsonValueKind.Array)
+            {
+                break;
+            }
+
+            foreach (var v in values.EnumerateArray())
+            {
+                var bid = v.GetProperty("id").GetInt32();
+                var bname = v.TryGetProperty("name", out var nm) ? nm.GetString() ?? "" : "";
+                var btype = v.TryGetProperty("type", out var tp) ? tp.GetString() ?? "" : "";
+                list.Add(new JiraBoardBriefDto(bid, bname, btype));
+            }
+
+            var chunkLen = values.GetArrayLength();
+            if (isLast || chunkLen == 0)
+            {
+                break;
+            }
+
+            startAt += chunkLen;
+        }
+
+        return list;
+    }
 }
+
+public sealed record JiraAgileBoardDto(int Id, string Name);
+
+public sealed record JiraSprintRow(int Id, string Name, string State, int? OriginBoardId);
+
+public sealed record JiraBoardBriefDto(int Id, string Name, string Type);

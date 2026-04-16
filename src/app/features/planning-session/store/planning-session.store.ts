@@ -456,7 +456,10 @@ export class PlanningSessionStore {
       .subscribe({ error: (err: unknown) => this.setActionErrorFromUnknown(err) });
   }
 
-  sendFinalEstimateToJira(): void {
+  /**
+   * @param sprintId Optional Jira Software sprint id — when set, issue is moved to that sprint after story points.
+   */
+  sendFinalEstimateToJira(sprintId?: number | null): void {
     const vm = this.roomView();
     const uid = this.auth.currentUser?.uid ?? null;
     const sid = this.sessionId();
@@ -489,6 +492,7 @@ export class PlanningSessionStore {
         jiraIssueKey: issueKey,
         jiraSiteUrl: fe.jiraSiteUrl,
         jiraBoardId: fe.jiraBoardId,
+        sprintId: sprintId ?? undefined,
         includeComment: false,
         votes: vm.results.map((r) => ({
           memberId: r.memberId,
