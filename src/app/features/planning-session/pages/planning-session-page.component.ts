@@ -8,6 +8,7 @@ import { PlanningRoomErrorBannerComponent } from '../components/presentational/p
 import { PlanningRoomLoadingComponent } from '../components/presentational/planning-room-loading.component';
 import { PlanningRoomMainColumnComponent } from '../components/presentational/planning-room-main-column.component';
 import { PlanningRoomMissingComponent } from '../components/presentational/planning-room-missing.component';
+import { PlanningRoomRemovedComponent } from '../components/presentational/planning-room-removed.component';
 import { PlanningRoomSidebarComponent } from '../components/presentational/planning-room-sidebar.component';
 import { StoryEditDialogComponent } from '../components/presentational/story-edit-dialog.component';
 import { PlanningSessionStore } from '../store/planning-session.store';
@@ -19,6 +20,7 @@ import { PlanningSessionStore } from '../store/planning-session.store';
     SessionHeaderComponent,
     PlanningRoomLoadingComponent,
     PlanningRoomMissingComponent,
+    PlanningRoomRemovedComponent,
     PlanningRoomErrorBannerComponent,
     PlanningRoomActiveStoryNoticeComponent,
     PlanningRoomSidebarComponent,

@@ -5,6 +5,11 @@
   @case ('missing') {
     <app-planning-room-missing />
   }
+  @case ('removed') {
+    @if (store.sessionId(); as sid) {
+      <app-planning-room-removed [sessionId]="sid" />
+    }
+  }
   @case ('ready') {
     @if (store.roomView(); as vm) {
       <span class="sr-only" aria-live="polite">{{ copyStatus() }}</span>

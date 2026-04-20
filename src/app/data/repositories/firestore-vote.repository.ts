@@ -80,6 +80,37 @@ export class FirestoreVoteRepository implements VoteRepository {
     return defer(() => from(this.commitDeleteVotesForRound(sessionId, storyId, roundEpoch)));
   }
 
+  deleteAllVotesForMember(sessionId: string, memberId: string): Observable<void> {
+    return defer(() => from(this.commitDeleteAllVotesForMember(sessionId, memberId)));
+  }
+
+  private async commitDeleteAllVotesForMember(sessionId: string, memberId: string): Promise<void> {
+    const sid = sessionId.trim();
+    const mid = memberId.trim();
+    if (!sid || !mid) {
+      return;
+    }
+    const col = collection(this.firestore, SESSIONS_COLLECTION, sid, 'votes');
+    const q = query(col, where('memberId', '==', mid));
+    const snap = await getDocs(q);
+    const refs = snap.docs.map((d) => d.ref);
+    const maxBatch = 500;
+    let batch = writeBatch(this.firestore);
+    let opCount = 0;
+    for (const ref of refs) {
+      batch.delete(ref);
+      opCount++;
+      if (opCount >= maxBatch) {
+        await batch.commit();
+        batch = writeBatch(this.firestore);
+        opCount = 0;
+      }
+    }
+    if (opCount > 0) {
+      await batch.commit();
+    }
+  }
+
   private async commitDeleteVotesForRound(
     sessionId: string,
     storyId: string,

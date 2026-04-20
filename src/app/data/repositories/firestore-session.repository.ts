@@ -2,6 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import {
   DocumentData,
   Firestore,
+  deleteDoc,
   deleteField,
   doc,
   docData,
@@ -93,6 +94,10 @@ export class FirestoreSessionRepository implements SessionRepository {
     return defer(() =>
       from(this.commitTransferModerator(sessionId.trim(), previousModeratorUid, newModeratorUid)),
     );
+  }
+
+  deleteSessionMember(sessionId: string, memberId: string): Observable<void> {
+    return defer(() => from(this.commitDeleteSessionMember(sessionId.trim(), memberId.trim())));
   }
 
   private async commitReveal(sessionId: string, revealedByMemberId: string): Promise<void> {
@@ -308,5 +313,17 @@ export class FirestoreSessionRepository implements SessionRepository {
       updatedAt: serverTimestamp(),
     });
     await batch.commit();
+  }
+
+  private async commitDeleteSessionMember(sessionId: string, memberId: string): Promise<void> {
+    if (!sessionId || !memberId) {
+      return;
+    }
+    const ref = doc(this.firestore, SESSIONS_COLLECTION, sessionId, 'members', memberId);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) {
+      throw new Error('TRANSFER_INVALID_MEMBER');
+    }
+    await deleteDoc(ref);
   }
 }

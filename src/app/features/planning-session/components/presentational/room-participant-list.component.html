@@ -17,9 +17,7 @@
       </div>
       <div class="member__info">
         <span class="member__name" [attr.title]="p.displayName">{{ p.displayName }}</span>
-        @if (p.isModerator) {
-          <span class="member__badge">Moderator</span>
-        }
+
       </div>
       <div class="member__vote" aria-hidden="true">
         @if (p.cardLabel !== null) {
@@ -30,16 +28,33 @@
           <span class="member__vote-label member__vote-label--pending">Not voted</span>
         }
       </div>
-      @if (canTransferModerator() && !p.isModerator) {
+      @if (p.isModerator) {
+          <span class="member__badge">Moderator</span>
+        }
+      @if ((canTransferModerator() || canRemoveMembers()) && !p.isModerator) {
         <div class="member__actions">
-          <button
-            type="button"
-            class="member__make-mod"
-            [disabled]="transferBusy()"
-            (click)="requestTransferModerator.emit(p.memberId)"
-          >
-            Make moderator
-          </button>
+          @if (canTransferModerator()) {
+            <button
+              type="button"
+              class="member__make-mod"
+              [disabled]="transferBusy()"
+              (click)="requestTransferModerator.emit(p.memberId)"
+              title="Make Moderator"
+            >
+              Make Mod.
+            </button>
+          }
+          @if (canRemoveMembers() && !p.isLocalUser) {
+            <button
+              type="button"
+              class="member__remove"
+              [disabled]="transferBusy()"
+              (click)="requestRemoveMember.emit(p.memberId)"
+              title="Remove Participant"
+            >
+              x
+            </button>
+          }
         </div>
       }
     </li>

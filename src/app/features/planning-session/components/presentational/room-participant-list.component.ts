@@ -14,8 +14,11 @@ export class RoomParticipantListComponent {
   readonly votesRevealed = input(false);
   /** Current user is moderator and may hand off the role. */
   readonly canTransferModerator = input(false);
+  /** Moderator may remove other participants (not themselves, not the moderator row). */
+  readonly canRemoveMembers = input(false);
   readonly transferBusy = input(false);
   readonly requestTransferModerator = output<string>();
+  readonly requestRemoveMember = output<string>();
 
   protected trackRow(_i: number, r: ParticipantRowVm): string {
     return r.memberId;

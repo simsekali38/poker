@@ -21,8 +21,10 @@ import { PlanningSessionStore } from '../../store/planning-session.store';
           [rows]="vm().participants"
           [votesRevealed]="vm().votesRevealed"
           [canTransferModerator]="vm().isModerator && vm().sessionStatus === 'active'"
+          [canRemoveMembers]="vm().isModerator && vm().sessionStatus === 'active'"
           [transferBusy]="store.moderationBusy()"
           (requestTransferModerator)="onRequestTransferModerator($event)"
+          (requestRemoveMember)="onRequestRemoveMember($event)"
         />
       </app-ui-panel>
       <div class="sidebar__stories" aria-label="Stories">
@@ -57,6 +59,20 @@ export class PlanningRoomSidebarComponent {
     }
     this.store.transferModeratorTo(memberId);
   }
+
+  protected onRequestRemoveMember(memberId: string): void {
+    const name =
+      this.vm().participants.find((p) => p.memberId === memberId)?.displayName?.trim() ||
+      'this participant';
+    const ok = confirm(
+      `Remove “${name}” from this session?\n\nTheir votes for this session will be deleted.`,
+    );
+    if (!ok) {
+      return;
+    }
+    this.store.removeSessionMember(memberId);
+  }
+
   readonly storyBusy = input(false);
   readonly switchStory = output<string>();
   readonly createStory = output<{

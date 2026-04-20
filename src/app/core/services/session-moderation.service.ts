@@ -19,7 +19,9 @@ export type SessionModerationFailure =
   | 'INVALID_JIRA_SITE'
   | 'INVALID_JIRA_BOARD_ID'
   | 'TRANSFER_INVALID_MEMBER'
-  | 'TRANSFER_SAME_AS_CURRENT';
+  | 'TRANSFER_SAME_AS_CURRENT'
+  | 'REMOVE_MEMBER_SELF'
+  | 'REMOVE_MODERATOR';
 
 @Injectable({ providedIn: 'root' })
 export class SessionModerationService {
@@ -434,6 +436,43 @@ export class SessionModerationService {
   /**
    * Hands moderator role to another session member. Updates session `moderatorId` and both members' `role`.
    */
+  /**
+   * Removes a participant from the session (moderator only). Deletes their votes, then their member doc.
+   * Cannot remove the moderator or yourself; transfer moderation first if needed.
+   */
+  removeMember(sessionId: string, moderatorUid: string, targetMemberUid: string): Observable<void> {
+    const sid = sessionId.trim();
+    const target = targetMemberUid.trim();
+    if (!sid) {
+      return throwError(() => this.err('SESSION_NOT_FOUND'));
+    }
+    if (!target) {
+      return throwError(() => this.err('TRANSFER_INVALID_MEMBER'));
+    }
+    if (target === moderatorUid) {
+      return throwError(() => this.err('REMOVE_MEMBER_SELF'));
+    }
+    return this.sessions.getSessionOnce(sid).pipe(
+      switchMap((session) => {
+        if (!session) {
+          return throwError(() => this.err('SESSION_NOT_FOUND'));
+        }
+        if (session.moderatorId !== moderatorUid) {
+          return throwError(() => this.err('NOT_MODERATOR'));
+        }
+        if (session.status !== 'active') {
+          return throwError(() => this.err('SESSION_NOT_ACTIVE'));
+        }
+        if (session.moderatorId === target) {
+          return throwError(() => this.err('REMOVE_MODERATOR'));
+        }
+        return this.votes.deleteAllVotesForMember(sid, target).pipe(
+          switchMap(() => this.sessions.deleteSessionMember(sid, target)),
+        );
+      }),
+    );
+  }
+
   transferModerator(sessionId: string, moderatorUid: string, newModeratorUid: string): Observable<void> {
     const sid = sessionId.trim();
     const next = newModeratorUid.trim();
@@ -550,6 +589,10 @@ export class SessionModerationService {
         return 'That participant is not in this session.';
       case 'TRANSFER_SAME_AS_CURRENT':
         return 'Pick a different participant to become moderator.';
+      case 'REMOVE_MEMBER_SELF':
+        return 'You cannot remove yourself from the session.';
+      case 'REMOVE_MODERATOR':
+        return 'Transfer the moderator role before removing that participant.';
       default:
         return 'Action could not be completed.';
     }

@@ -8,6 +8,7 @@ import { parseJiraIssueKey } from '@app/shared/utils/jira-issue-key.utils';
 import { normalizeJiraSiteUrl } from '@app/shared/utils/jira-site.utils';
 import { JiraBackendService } from '@app/core/services/jira-backend.service';
 import { JiraPlanningIntegrationService } from '@app/core/services/jira-planning-integration.service';
+import { SessionLocalIdentityService } from '@app/core/services/session-local-identity.service';
 import { SessionModerationService } from '@app/core/services/session-moderation.service';
 import { isFirebasePermissionDenied } from '@app/core/utils/firebase-error.utils';
 import { isSessionModerationError } from '@app/core/utils/session-moderation-error.utils';
@@ -49,7 +50,7 @@ type RoomStreamState =
   | { kind: 'missing' }
   | { kind: 'ready'; payload: SessionRoomPayload };
 
-export type PlanningRoomPhase = 'loading' | 'missing' | 'ready';
+export type PlanningRoomPhase = 'loading' | 'missing' | 'ready' | 'removed';
 
 type PendingLocalVote = {
   card: VoteCard;
@@ -66,6 +67,7 @@ export class PlanningSessionStore {
   private readonly stories = inject(STORY_REPOSITORY);
   private readonly votes = inject(VOTE_REPOSITORY);
   private readonly moderation = inject(SessionModerationService);
+  private readonly localIdentity = inject(SessionLocalIdentityService);
   private readonly jira = inject(JiraPlanningIntegrationService);
   private readonly jiraBackend = inject(JiraBackendService);
 
@@ -214,6 +216,11 @@ export class PlanningSessionStore {
         if (state.kind === 'missing') {
           return { phase: 'missing', view: null };
         }
+        const members = state.payload.members;
+        const inRoom = uid !== null && members.some((m) => m.id === uid);
+        if (uid !== null && members.length > 0 && !inRoom) {
+          return { phase: 'removed', view: null };
+        }
         return {
           phase: 'ready',
           view: buildPlanningRoomViewModel(state.payload, uid),
@@ -244,6 +251,15 @@ export class PlanningSessionStore {
   private prevSessionIdForAutoReveal: string | null = null;
 
   constructor() {
+    effect(() => {
+      const phase = this.roomPhase();
+      const sid = this.sessionId();
+      if (phase !== 'removed' || !sid) {
+        return;
+      }
+      untracked(() => this.localIdentity.clearBinding(sid));
+    });
+
     effect(() => {
       const base = this.planningRoom().view;
       const pending = this.pendingLocalVote();
@@ -808,6 +824,27 @@ export class PlanningSessionStore {
     this.moderationBusy.set(true);
     this.moderation
       .transferModerator(sid, uid, next)
+      .pipe(
+        take(1),
+        finalize(() => this.moderationBusy.set(false)),
+      )
+      .subscribe({
+        error: (err: unknown) => this.setActionErrorFromUnknown(err),
+      });
+  }
+
+  /** Moderator only — removes another participant and their votes from the session. */
+  removeSessionMember(targetMemberId: string): void {
+    const uid = this.auth.currentUser?.uid ?? null;
+    const sid = this.sessionId();
+    const target = targetMemberId.trim();
+    if (!uid || !sid || !target || this.moderationBusy()) {
+      return;
+    }
+    this.actionError.set(null);
+    this.moderationBusy.set(true);
+    this.moderation
+      .removeMember(sid, uid, target)
       .pipe(
         take(1),
         finalize(() => this.moderationBusy.set(false)),

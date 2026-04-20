@@ -33,4 +33,7 @@ export interface VoteRepository {
     storyId: string,
     roundEpoch: number,
   ): Observable<void>;
+
+  /** Deletes every vote doc whose `memberId` matches (e.g. when removing a participant). */
+  deleteAllVotesForMember(sessionId: string, memberId: string): Observable<void>;
 }

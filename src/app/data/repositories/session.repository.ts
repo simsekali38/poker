@@ -90,4 +90,7 @@ export interface SessionRepository {
     previousModeratorUid: string,
     newModeratorUid: string,
   ): Observable<void>;
+
+  /** Deletes `members/{memberId}` if it exists (moderator-only in rules). */
+  deleteSessionMember(sessionId: string, memberId: string): Observable<void>;
 }
